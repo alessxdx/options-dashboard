@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Options Trading Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+#pin-overlay {
+  position: fixed; inset: 0; background: #0d1117; z-index: 99999;
+  display: flex; align-items: center; justify-content: center; flex-direction: column;
+}
+#pin-box {
+  background: #161b22; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;
+  padding: 2.5rem 2rem; width: 320px; text-align: center;
+}
+#pin-title { font-family: 'Montserrat', sans-serif; font-size: 20px; font-weight: 700; color: #e6edf3; margin-bottom: 6px; }
+#pin-sub { font-family: 'Montserrat', sans-serif; font-size: 13px; color: #8b949e; margin-bottom: 1.5rem; }
+#pin-dots { display: flex; justify-content: center; gap: 12px; margin-bottom: 1.5rem; }
+.pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #8b949e; background: transparent; transition: all 0.15s; }
+.pin-dot.filled { background: #00d084; border-color: #00d084; }
+#pin-error { font-family: 'Montserrat', sans-serif; font-size: 13px; color: #ff5555; margin-bottom: 1rem; min-height: 18px; }
+#pin-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.pin-key {
+  font-family: 'Montserrat', sans-serif; font-size: 18px; font-weight: 600;
+  color: #e6edf3; background: #1e2530; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px; padding: 14px; cursor: pointer; transition: all 0.1s;
+}
+.pin-key:hover { background: #2d3748; border-color: rgba(255,255,255,0.2); }
+.pin-key:active { transform: scale(0.95); }
+.pin-key.del { color: #ff5555; }
+.pin-key.empty { visibility: hidden; }
+</style>
+<style>
+:root {
+  --bg: #0d1117; --bg2: #161b22; --bg3: #1e2530;
+  --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+  --text: #e6edf3; --text2: #8b949e; --text3: #c9d1d9;
+  --green: #00d084; --green-dim: rgba(0,208,132,0.15);
+  --red: #ff5555; --red-dim: rgba(255,85,85,0.15);
+  --blue: #58a6ff; --blue-dim: rgba(88,166,255,0.12);
+  --amber: #f0a500; --amber-dim: rgba(240,165,0,0.13);
+  --purple: #bc8cff; --purple-dim: rgba(188,140,255,0.13);
+  --teal: #39d0d8;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Montserrat', sans-serif; background: var(--bg); padding: 1.25rem; color: var(--text); min-height: 100vh; font-size: 15px; }
+.dash { max-width: 1200px; margin: 0 auto; }
+.header { display: flex; align-items: center; gap: 12px; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+.header-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+h1 { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+.section-title { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 1.5rem; }
+.metric-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; position: relative; overflow: hidden; }
+.metric-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--accent, var(--blue)); border-radius: 10px 10px 0 0; }
+.metric-label { font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+.metric-value { font-size: 22px; font-weight: 700; color: var(--text); }
+.metric-value.pos { color: var(--green); }
+.metric-value.neg { color: var(--red); }
+.metric-value.neu { color: var(--text); }
+.chart-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+.chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+.table-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-weight: 600; font-size: 12px; color: var(--text2); padding: 9px 10px; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.05em; }
+td { padding: 10px 10px; border-bottom: 1px solid var(--border); color: var(--text3); font-size: 14px; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.03); }
+.badge { display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.03em; }
+.badge-closed { background: rgba(0,208,132,0.15); color: #00d084; border: 1px solid rgba(0,208,132,0.25); }
+.badge-expired { background: rgba(88,166,255,0.12); color: #58a6ff; border: 1px solid rgba(88,166,255,0.25); }
+.badge-assigned { background: rgba(240,165,0,0.13); color: #f0a500; border: 1px solid rgba(240,165,0,0.25); }
+.badge-open { background: rgba(188,140,255,0.13); color: #bc8cff; border: 1px solid rgba(188,140,255,0.25); }
+.pos { color: var(--green); font-weight: 600; }
+.neg { color: var(--red); font-weight: 600; }
+.tabs { display: flex; gap: 4px; margin-bottom: 1.25rem; flex-wrap: wrap; background: var(--bg2); padding: 5px; border-radius: 10px; border: 1px solid var(--border); width: fit-content; }
+.tab { padding: 8px 18px; border-radius: 7px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; background: transparent; color: var(--text2); transition: all 0.15s; }
+.tab:hover { color: var(--text); background: var(--bg3); }
+.tab.active { background: var(--blue); color: #fff; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.add-form { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group label { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.04em; }
+.form-group input, .form-group select { font-size: 14px; font-family: 'Montserrat', sans-serif; padding: 7px 10px; border-radius: 7px; border: 1px solid var(--border2); background: var(--bg3); color: var(--text); height: 36px; outline: none; }
+.form-group input:focus, .form-group select:focus { border-color: var(--blue); }
+.form-group select option { background: var(--bg3); }
+.btn { padding: 9px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; font-family: 'Montserrat', sans-serif; cursor: pointer; border: 1px solid var(--border2); background: var(--bg3); color: var(--text); }
+.btn:hover { border-color: var(--blue); color: var(--blue); }
+.btn-primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+.btn-primary:hover { background: #79b8ff; border-color: #79b8ff; color: #fff; }
+.search-bar { padding: 9px 14px; border-radius: 8px; border: 1px solid var(--border2); font-size: 14px; font-family: 'Montserrat', sans-serif; width: 100%; margin-bottom: 10px; background: var(--bg3); color: var(--text); outline: none; }
+.search-bar:focus { border-color: var(--blue); }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; font-size: 13px; color: var(--text2); font-weight: 500; }
+.legend span { display: flex; align-items: center; gap: 5px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+@media (max-width: 600px) { .chart-row { grid-template-columns: 1fr; } }
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:500; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal { background: var(--bg2); border: 1px solid var(--border2); border-radius: 14px; padding:1.5rem; width:90%; max-width:680px; max-height:90vh; overflow-y:auto; }
+.modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; }
+.modal-title { font-size:17px; font-weight:700; color: var(--text); }
+.modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--text2); line-height:1; padding:0 4px; }
+.modal-close:hover { color: var(--text); }
+.btn-danger { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+.btn-danger:hover { background: rgba(255,85,85,0.25); }
+.edit-btn { background: var(--bg3); border: 1px solid var(--border2); border-radius: 5px; padding: 3px 10px; font-size: 12px; font-weight: 600; font-family: 'Montserrat', sans-serif; cursor: pointer; color: var(--text2); }
+.edit-btn:hover { border-color: var(--blue); color: var(--blue); }
+.chart-toggle { padding: 5px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; font-family: 'Montserrat', sans-serif; cursor: pointer; border: 1px solid var(--border2); background: transparent; color: var(--text2); }
+.chart-toggle:hover { color: var(--text); background: var(--bg3); }
+.chart-toggle.active { background: var(--green); border-color: var(--green); color: #000; }
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable:hover { color: var(--blue); }
+th.sort-asc::after { content: ' ▲'; color: var(--blue); font-size: 10px; }
+th.sort-desc::after { content: ' ▼'; color: var(--blue); font-size: 10px; }
+.month-filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1rem; }
+.month-btn { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; font-family: 'Montserrat', sans-serif; cursor: pointer; border: 1px solid var(--border2); background: var(--bg3); color: var(--text2); transition: all 0.15s; }
+.month-btn:hover { border-color: var(--blue); color: var(--blue); }
+.month-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+/* Color-coded trade rows */
+tr.row-win td { background: rgba(0,208,132,0.04); }
+tr.row-loss td { background: rgba(255,85,85,0.04); }
+tr.row-win:hover td { background: rgba(0,208,132,0.09); }
+tr.row-loss:hover td { background: rgba(255,85,85,0.09); }
+/* Notes indicator */
+.note-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--amber); margin-left:6px; vertical-align:middle; flex-shrink:0; }
+.note-tooltip { position:fixed; background:#1e2530; border:1px solid rgba(255,255,255,0.15); border-radius:8px; padding:8px 12px; font-size:12px; color:var(--text3); max-width:260px; z-index:400; pointer-events:none; box-shadow:0 4px 16px rgba(0,0,0,0.4); line-height:1.5; display:none; }
+/* Quick close modal */
+#quick-close-modal { background:var(--bg2); border:1px solid var(--border2); border-radius:14px; padding:1.5rem; width:90%; max-width:400px; }
+/* Animated counter */
+@keyframes countUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+.metric-value { animation: countUp 0.4s ease; }
+/* Export btn */
+.export-btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; font-family:'Montserrat',sans-serif; cursor:pointer; border:1px solid var(--border2); background:var(--bg3); color:var(--text2); margin-bottom:10px; }
+.export-btn:hover { border-color:var(--green); color:var(--green); }
+/* Action buttons in table */
+.action-btns { display:flex; gap:4px; }
+.quick-btn { background:none; border:1px solid var(--border2); border-radius:5px; padding:2px 8px; font-size:11px; font-weight:600; font-family:'Montserrat',sans-serif; cursor:pointer; color:var(--text2); white-space:nowrap; }
+.quick-btn:hover { border-color:var(--blue); color:var(--blue); }
+.quick-btn.close-btn:hover { border-color:var(--green); color:var(--green); }
+.quick-btn.dup-btn:hover { border-color:var(--amber); color:var(--amber); }
+/* Status filter pills */
+.status-filter-btn { padding:7px 18px; border-radius:20px; font-size:13px; font-weight:600; font-family:'Montserrat',sans-serif; cursor:pointer; border:1px solid var(--border2); background:var(--bg3); color:var(--text2); transition:all 0.15s; }
+.status-filter-btn:hover { color:var(--text); border-color:var(--border); }
+.status-filter-btn.active { background:var(--blue); border-color:var(--blue); color:#fff; }
+.status-filter-btn.open.active { background:rgba(188,140,255,0.2); border-color:#bc8cff; color:#bc8cff; }
+.status-filter-btn.closed.active { background:rgba(0,208,132,0.15); border-color:#00d084; color:#00d084; }
+.status-filter-btn.expired.active { background:rgba(88,166,255,0.12); border-color:#58a6ff; color:#58a6ff; }
+.status-filter-btn.assigned.active { background:rgba(240,165,0,0.13); border-color:#f0a500; color:#f0a500; }
+</style>
+</head>
+<body>
+<div id="pin-overlay">
+  <div id="pin-box">
+    <div id="pin-title">Options Trading Dashboard</div>
+    <div id="pin-sub">Enter your PIN to continue</div>
+    <div id="pin-dots">
+      <div class="pin-dot" id="d0"></div>
+      <div class="pin-dot" id="d1"></div>
+      <div class="pin-dot" id="d2"></div>
+      <div class="pin-dot" id="d3"></div>
+    </div>
+    <div id="pin-error"></div>
+    <div id="pin-keypad">
+      <button class="pin-key" onclick="pinPress('1')">1</button>
+      <button class="pin-key" onclick="pinPress('2')">2</button>
+      <button class="pin-key" onclick="pinPress('3')">3</button>
+      <button class="pin-key" onclick="pinPress('4')">4</button>
+      <button class="pin-key" onclick="pinPress('5')">5</button>
+      <button class="pin-key" onclick="pinPress('6')">6</button>
+      <button class="pin-key" onclick="pinPress('7')">7</button>
+      <button class="pin-key" onclick="pinPress('8')">8</button>
+      <button class="pin-key" onclick="pinPress('9')">9</button>
+      <button class="pin-key empty"></button>
+      <button class="pin-key" onclick="pinPress('0')">0</button>
+      <button class="pin-key del" onclick="pinDel()">⌫</button>
+    </div>
+  </div>
+</div>
+
+<div class="dash">
+<div class="header">
+  <div class="header-dot"></div>
+  <h1>Options Trading Dashboard</h1>
+  <span id="sync-status" style="margin-left:auto;font-size:13px;font-weight:500;"></span>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('overview')">Overview</div>
+  <div class="tab" onclick="switchTab('daily')">Daily P&L</div>
+  <div class="tab" onclick="switchTab('stocks')">By stock</div>
+  <div class="tab" onclick="switchTab('trades')">Trade history</div>
+  <div class="tab" onclick="switchTab('add')">+ Add trade</div>
+</div>
+
+<div id="tab-overview" class="tab-content active">
+  <p class="section-title">Trade counts</p>
+  <div class="metric-grid" id="metric-grid-counts"></div>
+  <p class="section-title" style="margin-top:1rem;">Performance</p>
+  <div class="metric-grid" id="metric-grid-perf"></div>
+  <div class="chart-row">
+    <div class="chart-card" style="grid-column: 1 / -1;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <p class="section-title" style="margin-bottom:0;">Cumulative net P&L</p>
+        <div style="display:flex;gap:4px;">
+          <button class="chart-toggle active" id="tog-all" onclick="setCumulView('all')">All</button>
+          <button class="chart-toggle" id="tog-daily" onclick="setCumulView('daily')">Daily</button>
+          <button class="chart-toggle" id="tog-weekly" onclick="setCumulView('weekly')">Weekly</button>
+        </div>
+      </div>
+      <div style="position:relative;height:260px;"><canvas id="cumulChart"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-row">
+    <div class="chart-card">
+      <p class="section-title">Win / loss breakdown</p>
+      <div id="winleg" class="legend"></div>
+      <div style="position:relative;height:200px;"><canvas id="winChart"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-card">
+    <p class="section-title">Trade setup breakdown</p>
+    <div id="setupleg" class="legend"></div>
+    <div style="position:relative;height:200px;"><canvas id="setupChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <p class="section-title">Monthly P&L</p>
+    <div style="position:relative;height:220px;"><canvas id="monthlyChart" role="img" aria-label="Monthly P&L bar chart"></canvas></div>
+  </div>
+</div>
+
+<div id="tab-daily" class="tab-content">
+  <p class="section-title">Daily options P&L</p>
+  <div class="chart-card" style="margin-bottom:1rem;">
+    <p class="section-title" style="margin-bottom:8px;">Filter by month</p>
+    <div class="month-filter" id="month-filter-btns"></div>
+    <div style="display:flex;gap:8px;margin-top:4px;">
+      <button class="btn" onclick="clearMonthFilter()" style="font-size:13px;padding:5px 14px;">Clear filter</button>
+    </div>
+  </div>
+  <div class="chart-card">
+    <div style="position:relative;height:260px;"><canvas id="dailyChart"></canvas></div>
+  </div>
+  <div class="table-card">
+    <table>
+      <thead id="daily-thead"><tr></tr></thead>
+      <tbody id="daily-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="tab-stocks" class="tab-content">
+  <p class="section-title">Performance by stock</p>
+  <div class="chart-card">
+    <div id="stockleg" class="legend"></div>
+    <div style="position:relative;" id="stock-chart-wrap"><canvas id="stockChart"></canvas></div>
+  </div>
+  <div class="table-card" style="margin-top:1rem;">
+    <table>
+      <thead id="stock-thead"><tr></tr></thead>
+      <tbody id="stock-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="tab-trades" class="tab-content">
+  <p class="section-title">Trade history</p>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;" id="status-filter-btns">
+    <button class="status-filter-btn active" onclick="setStatusFilter('all')">All</button>
+    <button class="status-filter-btn open" onclick="setStatusFilter('Open')">Open</button>
+    <button class="status-filter-btn closed" onclick="setStatusFilter('Closed')">Closed</button>
+    <button class="status-filter-btn expired" onclick="setStatusFilter('Expired')">Expired</button>
+    <button class="status-filter-btn assigned" onclick="setStatusFilter('Assigned')">Assigned</button>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+    <input class="search-bar" placeholder="Search by trade ID, stock, setup..." id="trade-search" oninput="renderTradeTable()" style="margin-bottom:0;flex:1;min-width:200px;">
+    <button class="export-btn" onclick="exportCSV()">⬇ Export CSV</button>
+  </div>
+  <div class="table-card" style="padding:0;">
+    <table>
+      <thead id="trade-thead"><tr></tr></thead>
+      <tbody id="trade-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="tab-add" class="tab-content">
+  <p class="section-title">Add new trade</p>
+  <div class="add-form">
+    <div class="form-grid">
+      <div class="form-group"><label>Stock</label><input id="f-stock" placeholder="e.g. AAPL" /></div>
+      <div class="form-group"><label>Trade setup</label>
+        <select id="f-setup"><option>Short Put</option><option>Short Call</option><option>Long Put</option><option>Long Call</option></select>
+      </div>
+      <div class="form-group"><label>Expiration</label><input id="f-exp" type="date" /></div>
+      <div class="form-group"><label>Strike</label><input id="f-strike" type="number" placeholder="e.g. 200" /></div>
+      <div class="form-group"><label>Open date</label><input id="f-open" type="date" /></div>
+      <div class="form-group"><label>Close date</label><input id="f-close" type="date" /></div>
+      <div class="form-group"><label>Contracts</label><input id="f-contracts" type="number" value="1" /></div>
+      <div class="form-group"><label>Open price / contract ($)</label><input id="f-oprice" type="number" step="0.01" /></div>
+      <div class="form-group"><label>Close price / contract ($)</label><input id="f-cprice" type="number" step="0.01" /></div>
+      <div class="form-group"><label>Fees ($)</label><input id="f-fees" type="number" step="0.01" /></div>
+      <div class="form-group"><label>Status</label>
+        <select id="f-status"><option>Open</option><option>Closed</option><option>Expired</option><option>Assigned</option></select>
+      </div>
+      <div class="form-group"><label>Notes</label><input id="f-notes" placeholder="Optional" /></div>
+    </div>
+    <div id="form-msg" style="font-size:13px;margin-bottom:8px;"></div>
+    <button class="btn btn-primary" onclick="addTrade()">Save trade</button>
+  </div>
+  <p class="section-title" style="margin-top:1rem;">Import from CSV</p>
+  <div class="add-form">
+    <p style="font-size:13px;color:#888;margin-bottom:10px;">Upload your Excel export as CSV. Columns: Trade ID, Stock, Trade Setup, Expiration, Strike, Open Date, Close Date, Contracts, Open Price/Contract ($), Close Price/Contract ($), Gross P&L ($), Fees ($), Net P&L After Fees ($), Status, Days Held, Notes</p>
+    <input type="file" id="csv-file" accept=".csv" style="font-size:13px;margin-bottom:8px;" onchange="importCSV(event)">
+    <div id="csv-msg" style="font-size:13px;"></div>
+  </div>
+</div>
+</div>
+
+<!-- Stock Drill-down Modal -->
+<div class="modal-overlay" id="stock-modal" onclick="if(event.target===this)closeStockModal()">
+  <div class="modal" style="max-width:820px;">
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span id="stock-modal-badge" class="badge" style="font-size:13px;padding:4px 12px;"></span>
+        <span class="modal-title" id="stock-modal-title"></span>
+      </div>
+      <button class="modal-close" onclick="closeStockModal()">&#x2715;</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:1rem;" id="stock-modal-stats"></div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead id="stock-modal-thead"><tr></tr></thead>
+        <tbody id="stock-modal-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Daily Drill-down Modal -->
+<div class="modal-overlay" id="daily-modal" onclick="if(event.target===this)closeDailyModal()">
+  <div class="modal" style="max-width:860px;">
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span id="daily-modal-badge" class="badge" style="font-size:13px;padding:4px 12px;"></span>
+        <span class="modal-title" id="daily-modal-title"></span>
+      </div>
+      <button class="modal-close" onclick="closeDailyModal()">&#x2715;</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:1rem;" id="daily-modal-stats"></div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead id="daily-modal-thead"><tr></tr></thead>
+        <tbody id="daily-modal-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Close Modal -->
+<div class="modal-overlay" id="quick-close-overlay" onclick="if(event.target===this)closeQuickClose()">
+  <div id="quick-close-modal">
+    <div class="modal-header">
+      <span class="modal-title" id="qc-title">Close trade</span>
+      <button class="modal-close" onclick="closeQuickClose()">&#x2715;</button>
+    </div>
+    <div id="qc-info" style="font-size:13px;color:var(--text2);margin-bottom:1rem;"></div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+      <div class="form-group"><label>Close date</label><input id="qc-date" type="date"></div>
+      <div class="form-group"><label>Close price / contract ($)</label><input id="qc-price" type="number" step="0.01" placeholder="e.g. 0.05"></div>
+    </div>
+    <div class="form-group" style="margin-top:10px;">
+      <label>Status</label>
+      <select id="qc-status"><option>Closed</option><option>Expired</option><option>Assigned</option></select>
+    </div>
+    <div id="qc-msg" style="font-size:13px;margin-top:10px;min-height:18px;"></div>
+    <div style="display:flex;gap:8px;margin-top:1rem;">
+      <button class="btn btn-primary" onclick="saveQuickClose()">Save close</button>
+      <button class="btn" onclick="closeQuickClose()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Note tooltip -->
+<div id="note-tooltip" class="note-tooltip"></div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="edit-modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Edit trade</span>
+      <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Stock</label><input id="e-stock" /></div>
+      <div class="form-group"><label>Trade setup</label>
+        <select id="e-setup"><option>Short Put</option><option>Short Call</option><option>Long Put</option><option>Long Call</option></select>
+      </div>
+      <div class="form-group"><label>Expiration</label><input id="e-exp" type="date" /></div>
+      <div class="form-group"><label>Strike</label><input id="e-strike" type="number" /></div>
+      <div class="form-group"><label>Open date</label><input id="e-open" type="date" /></div>
+      <div class="form-group"><label>Close date</label><input id="e-close" type="date" /></div>
+      <div class="form-group"><label>Contracts</label><input id="e-contracts" type="number" /></div>
+      <div class="form-group"><label>Open price / contract ($)</label><input id="e-oprice" type="number" step="0.01" /></div>
+      <div class="form-group"><label>Close price / contract ($)</label><input id="e-cprice" type="number" step="0.01" /></div>
+      <div class="form-group"><label>Fees ($)</label><input id="e-fees" type="number" step="0.01" /></div>
+      <div class="form-group"><label>Status</label>
+        <select id="e-status"><option>Open</option><option>Closed</option><option>Expired</option><option>Assigned</option></select>
+      </div>
+      <div class="form-group"><label>Notes</label><input id="e-notes" /></div>
+    </div>
+    <div id="edit-msg" style="font-size:13px;margin-bottom:10px;"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="saveEdit()">Save changes</button>
+      <button class="btn btn-danger" onclick="deleteTrade()">Delete trade</button>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const SUPABASE_URL = 'https://lgpkeeaxjgdiabrdqjbk.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxncGtlZWF4amdkaWFicmRxamJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MDM3NjIsImV4cCI6MjA5MjA3OTc2Mn0.YNF0VIJq4PQMwaukQWoOmw5wnbFlb58iDQR5spi6q8g';
+const SEED_TRADES = [{"id": "ADBE|Put|2025-12-12|300", "stock": "ADBE", "setup": "Short Put", "exp": "2025-12-12", "strike": 300.0, "open": "2025-12-08", "close": "", "contracts": 1, "openPrice": 1.16, "closePrice": 0.56, "gross": 60.0, "fees": 0.62, "netPL": 59.38, "status": "Expired", "days": 4, "notes": ""}, {"id": "UBER|Put|2025-12-26|80", "stock": "UBER", "setup": "Short Put", "exp": "2025-12-26", "strike": 80.0, "open": "2025-12-10", "close": "2025-12-23", "contracts": 1, "openPrice": 0.77, "closePrice": 0.34, "gross": 43.0, "fees": 1.24, "netPL": 41.76, "status": "Closed", "days": 13, "notes": ""}, {"id": "NFLX|Put|2026-01-02|87", "stock": "NFLX", "setup": "Short Put", "exp": "2026-01-02", "strike": 87.0, "open": "2025-12-11", "close": "2025-12-30", "contracts": 1, "openPrice": 0.71, "closePrice": 0.02, "gross": 69.0, "fees": 1.24, "netPL": 67.76, "status": "Closed", "days": 19, "notes": ""}, {"id": "AMD|Put|2025-12-19|190", "stock": "AMD", "setup": "Short Put", "exp": "2025-12-19", "strike": 190.0, "open": "2025-12-11", "close": "", "contracts": 1, "openPrice": 0.67, "closePrice": null, "gross": 67.0, "fees": 0.62, "netPL": 66.38, "status": "Expired", "days": 8, "notes": ""}, {"id": "GOOG|Put|2026-01-02|300", "stock": "GOOG", "setup": "Short Put", "exp": "2026-01-02", "strike": 300.0, "open": "2025-12-23", "close": "", "contracts": 1, "openPrice": 0.82, "closePrice": null, "gross": 82.0, "fees": 0.62, "netPL": 81.38, "status": "Expired", "days": 10, "notes": ""}, {"id": "QBTS|Put|2026-01-23|22", "stock": "QBTS", "setup": "Short Put", "exp": "2026-01-23", "strike": 21.5, "open": "2025-12-26", "close": "2026-01-13", "contracts": 1, "openPrice": 0.6, "closePrice": 0.1, "gross": 50.0, "fees": 1.24, "netPL": 48.76, "status": "Closed", "days": 18, "notes": ""}, {"id": "ELF|Put|2026-01-09|72", "stock": "ELF", "setup": "Short Put", "exp": "2026-01-09", "strike": 72.0, "open": "2025-12-30", "close": "", "contracts": 1, "openPrice": 0.55, "closePrice": null, "gross": 55.0, "fees": 0.62, "netPL": 54.38, "status": "Expired", "days": 10, "notes": ""}, {"id": "NFLX|Put|2026-01-30|82", "stock": "NFLX", "setup": "Short Put", "exp": "2026-01-30", "strike": 82.0, "open": "2026-01-02", "close": "2026-01-20", "contracts": 1, "openPrice": 1.1, "closePrice": 1.2, "gross": -10.0, "fees": 1.24, "netPL": -11.24, "status": "Closed", "days": 18, "notes": ""}, {"id": "NBIS|Put|2026-01-23|75", "stock": "NBIS", "setup": "Short Put", "exp": "2026-01-23", "strike": 75.0, "open": "2026-01-05", "close": "2026-01-05", "contracts": 1, "openPrice": 1.2, "closePrice": 0.07, "gross": 113.0, "fees": 1.24, "netPL": 111.76, "status": "Closed", "days": 0, "notes": ""}, {"id": "NBIS|Put|2026-01-16|77", "stock": "NBIS", "setup": "Short Put", "exp": "2026-01-16", "strike": 77.0, "open": "2026-01-06", "close": "2026-01-13", "contracts": 1, "openPrice": 0.6, "closePrice": 0.06, "gross": 54.0, "fees": 1.24, "netPL": 52.76, "status": "Closed", "days": 7, "notes": ""}, {"id": "NBIS|Put|2026-01-23|89", "stock": "NBIS", "setup": "Short Put", "exp": "2026-01-23", "strike": 89.0, "open": "2026-01-13", "close": "", "contracts": 1, "openPrice": 0.89, "closePrice": null, "gross": 89.0, "fees": 0.62, "netPL": 88.38, "status": "Expired", "days": 10, "notes": ""}, {"id": "NBIS|Put|2026-01-30|88", "stock": "NBIS", "setup": "Short Put", "exp": "2026-01-30", "strike": 88.0, "open": "2026-01-20", "close": "2026-01-29", "contracts": 1, "openPrice": 1.8, "closePrice": 0.95, "gross": 85.0, "fees": 1.24, "netPL": 83.76, "status": "Closed", "days": 9, "notes": ""}, {"id": "QBTS|Put|2026-02-13|23", "stock": "QBTS", "setup": "Short Put", "exp": "2026-02-13", "strike": 23.0, "open": "2026-01-23", "close": "", "contracts": 1, "openPrice": 1.0, "closePrice": null, "gross": 100.0, "fees": 0.62, "netPL": 99.38, "status": "Assigned", "days": 21, "notes": "Assigned 100 shares at $23. Effective share price = $22"}, {"id": "ELF|Put|2026-02-27|75", "stock": "ELF", "setup": "Short Put", "exp": "2026-02-27", "strike": 75.0, "open": "2026-01-26", "close": "", "contracts": 1, "openPrice": 2.1, "closePrice": null, "gross": 210.0, "fees": 0.62, "netPL": 209.38, "status": "Expired", "days": 32, "notes": ""}, {"id": "IREN|Put|2026-02-06|47.5|T1A", "stock": "IREN", "setup": "Short Put", "exp": "2026-02-06", "strike": 47.5, "open": "2026-01-29", "close": "2026-02-06", "contracts": 1, "openPrice": 1.35, "closePrice": 4.8, "gross": -345.0, "fees": 1.24, "netPL": -346.24, "status": "Closed", "days": 8, "notes": ""}, {"id": "IREN|Put|2026-02-06|47.5|T1B", "stock": "IREN", "setup": "Short Put", "exp": "2026-02-06", "strike": 47.5, "open": "2026-01-29", "close": "", "contracts": 1, "openPrice": 1.35, "closePrice": null, "gross": 135.0, "fees": 0.62, "netPL": 134.38, "status": "Assigned", "days": 8, "notes": "Assigned 100 shares at $47.50. Effective stock price = $46.16"}, {"id": "NBIS|Put|2026-02-27|75", "stock": "NBIS", "setup": "Short Put", "exp": "2026-02-27", "strike": 75.0, "open": "2026-01-29", "close": "", "contracts": 1, "openPrice": 2.6, "closePrice": null, "gross": 260.0, "fees": 0.62, "netPL": 259.38, "status": "Expired", "days": 29, "notes": ""}, {"id": "IREN|Call|2026-02-27|50", "stock": "IREN", "setup": "Short Call", "exp": "2026-02-27", "strike": 50.0, "open": "2026-02-18", "close": "", "contracts": 1, "openPrice": 0.7, "closePrice": null, "gross": 70.0, "fees": 0.62, "netPL": 69.38, "status": "Expired", "days": 9, "notes": ""}, {"id": "QBTS|Call|2026-03-13|25", "stock": "QBTS", "setup": "Short Call", "exp": "2026-03-13", "strike": 25.0, "open": "2026-02-25", "close": "", "contracts": 1, "openPrice": 0.42, "closePrice": null, "gross": 42.0, "fees": 0.62, "netPL": 41.38, "status": "Expired", "days": 16, "notes": ""}, {"id": "NBIS|Put|2026-04-17|80", "stock": "NBIS", "setup": "Short Put", "exp": "2026-04-17", "strike": 80.0, "open": "2026-03-03", "close": "2026-03-04", "contracts": 1, "openPrice": 9.3, "closePrice": 5.05, "gross": 425.0, "fees": 1.24, "netPL": 423.76, "status": "Closed", "days": 1, "notes": ""}, {"id": "NBIS|Put|2026-03-27|73", "stock": "NBIS", "setup": "Short Put", "exp": "2026-03-27", "strike": 73.0, "open": "2026-03-03", "close": "2026-03-06", "contracts": 1, "openPrice": 3.5, "closePrice": 2.4, "gross": 110.0, "fees": 1.24, "netPL": 108.76, "status": "Closed", "days": 3, "notes": ""}, {"id": "IREN|Put|2026-04-17|35", "stock": "IREN", "setup": "Short Put", "exp": "2026-04-17", "strike": 35.0, "open": "2026-03-03", "close": "2026-03-16", "contracts": 1, "openPrice": 4.2, "closePrice": 1.64, "gross": 256.0, "fees": 1.24, "netPL": 254.76, "status": "Closed", "days": 13, "notes": ""}, {"id": "IREN|Put|2026-03-27|34", "stock": "IREN", "setup": "Short Put", "exp": "2026-03-27", "strike": 34.0, "open": "2026-03-03", "close": "2026-03-05", "contracts": 1, "openPrice": 2.12, "closePrice": 2.0, "gross": 12.0, "fees": 1.24, "netPL": 10.76, "status": "Closed", "days": 2, "notes": ""}, {"id": "BE|Put|2026-03-13|130", "stock": "BE", "setup": "Short Put", "exp": "2026-03-13", "strike": 130.0, "open": "2026-03-03", "close": "2026-03-10", "contracts": 1, "openPrice": 3.63, "closePrice": 0.9, "gross": 273.0, "fees": 1.24, "netPL": 271.76, "status": "Closed", "days": 7, "notes": ""}, {"id": "IREN|Call|2026-04-10|55", "stock": "IREN", "setup": "Short Call", "exp": "2026-04-10", "strike": 55.0, "open": "2026-03-04", "close": "", "contracts": 1, "openPrice": 1.9, "closePrice": null, "gross": 190.0, "fees": 0.62, "netPL": 189.38, "status": "Expired", "days": 37, "notes": ""}, {"id": "IREN|Put|2026-04-02|36", "stock": "IREN", "setup": "Short Put", "exp": "2026-04-02", "strike": 36.0, "open": "2026-03-05", "close": "2026-03-18", "contracts": 1, "openPrice": 2.83, "closePrice": 1.11, "gross": 172.0, "fees": 1.24, "netPL": 170.76, "status": "Closed", "days": 13, "notes": ""}, {"id": "BE|Put|2026-03-27|129", "stock": "BE", "setup": "Short Put", "exp": "2026-03-27", "strike": 129.0, "open": "2026-03-06", "close": "2026-03-11", "contracts": 1, "openPrice": 8.75, "closePrice": 3.55, "gross": 520.0, "fees": 1.3, "netPL": 518.7, "status": "Closed", "days": 5, "notes": ""}, {"id": "NBIS|Put|2026-04-17|85", "stock": "NBIS", "setup": "Short Put", "exp": "2026-04-17", "strike": 85.0, "open": "2026-03-12", "close": "2026-03-16", "contracts": 1, "openPrice": 3.3, "closePrice": 1.05, "gross": 225.0, "fees": 1.3, "netPL": 223.7, "status": "Closed", "days": 4, "notes": ""}, {"id": "NBIS|Put|2026-03-20|90", "stock": "NBIS", "setup": "Short Put", "exp": "2026-03-20", "strike": 90.0, "open": "2026-03-12", "close": "2026-03-16", "contracts": 1, "openPrice": 0.91, "closePrice": 0.09, "gross": 82.0, "fees": 1.3, "netPL": 80.7, "status": "Closed", "days": 4, "notes": ""}, {"id": "BE|Put|2026-04-17|120", "stock": "BE", "setup": "Short Put", "exp": "2026-04-17", "strike": 120.0, "open": "2026-03-13", "close": "2026-03-19", "contracts": 1, "openPrice": 6.4, "closePrice": 5.5, "gross": 90.0, "fees": 1.3, "netPL": 88.7, "status": "Closed", "days": 6, "notes": ""}, {"id": "BE|Put|2026-04-02|128", "stock": "BE", "setup": "Short Put", "exp": "2026-04-02", "strike": 128.0, "open": "2026-03-16", "close": "2026-03-18", "contracts": 1, "openPrice": 5.2, "closePrice": 2.75, "gross": 245.0, "fees": 1.3, "netPL": 243.7, "status": "Closed", "days": 2, "notes": ""}, {"id": "NBIS|Put|2026-04-17|98", "stock": "NBIS", "setup": "Short Put", "exp": "2026-04-17", "strike": 98.0, "open": "2026-03-17", "close": "2026-03-30", "contracts": 1, "openPrice": 3.25, "closePrice": 8.0, "gross": -475.0, "fees": 1.3, "netPL": -476.3, "status": "Closed", "days": 13, "notes": ""}, {"id": "BE|Put|2026-04-17|120|R2", "stock": "BE", "setup": "Short Put", "exp": "2026-04-17", "strike": 120.0, "open": "2026-03-19", "close": "2026-04-07", "contracts": 1, "openPrice": 4.85, "closePrice": 4.2, "gross": 65.0, "fees": 1.3, "netPL": 63.7, "status": "Closed", "days": 19, "notes": ""}, {"id": "MU|Call|2026-07-17|450", "stock": "MU", "setup": "Long Call", "exp": "2026-07-17", "strike": 450.0, "open": "2026-03-19", "close": "2026-03-19", "contracts": 1, "openPrice": 68.2, "closePrice": 74.0, "gross": 580.0, "fees": 1.3, "netPL": 578.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "TSM|Call|2026-06-18|340", "stock": "TSM", "setup": "Long Call", "exp": "2026-06-18", "strike": 340.0, "open": "2026-03-20", "close": "2026-03-23", "contracts": 1, "openPrice": 27.75, "closePrice": 28.5, "gross": 75.0, "fees": 1.3, "netPL": 73.7, "status": "Closed", "days": 3, "notes": ""}, {"id": "MU|Call|2026-06-18|450", "stock": "MU", "setup": "Long Call", "exp": "2026-06-18", "strike": 450.0, "open": "2026-03-20", "close": "2026-03-24", "contracts": 1, "openPrice": 57.05, "closePrice": 33.86, "gross": -2319.0, "fees": 1.3, "netPL": -2320.3, "status": "Closed", "days": 4, "notes": ""}, {"id": "MU|Call|2026-06-18|420", "stock": "MU", "setup": "Long Call", "exp": "2026-06-18", "strike": 420.0, "open": "2026-03-20", "close": "2026-03-20", "contracts": 1, "openPrice": 54.0, "closePrice": 55.05, "gross": 105.0, "fees": 1.3, "netPL": 103.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Call|2026-06-18|400", "stock": "MU", "setup": "Long Call", "exp": "2026-06-18", "strike": 400.0, "open": "2026-03-23", "close": "2026-03-23", "contracts": 1, "openPrice": 55.65, "closePrice": 56.8, "gross": 115.0, "fees": 1.3, "netPL": 113.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "NBIS|Put|2026-06-18|110", "stock": "NBIS", "setup": "Long Put", "exp": "2026-06-18", "strike": 110.0, "open": "2026-03-24", "close": "2026-03-24", "contracts": 1, "openPrice": 16.69, "closePrice": 17.0, "gross": 31.0, "fees": 1.3, "netPL": 29.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Put|2026-06-18|390", "stock": "MU", "setup": "Long Put", "exp": "2026-06-18", "strike": 390.0, "open": "2026-03-24", "close": "2026-03-24", "contracts": 1, "openPrice": 45.95, "closePrice": 47.0, "gross": 105.0, "fees": 1.3, "netPL": 103.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "AMD|Put|2026-06-18|200", "stock": "AMD", "setup": "Long Put", "exp": "2026-06-18", "strike": 200.0, "open": "2026-03-24", "close": "2026-03-24", "contracts": 1, "openPrice": 19.05, "closePrice": 19.9, "gross": 85.0, "fees": 1.3, "netPL": 83.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "AMD|Put|2026-06-18|210", "stock": "AMD", "setup": "Long Put", "exp": "2026-06-18", "strike": 210.0, "open": "2026-03-25", "close": "2026-03-25", "contracts": 1, "openPrice": 17.9, "closePrice": 18.7, "gross": 80.0, "fees": 1.3, "netPL": 78.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "AMD|Put|2026-06-18|210|R2", "stock": "AMD", "setup": "Long Put", "exp": "2026-06-18", "strike": 210.0, "open": "2026-03-25", "close": "2026-03-26", "contracts": 1, "openPrice": 18.0, "closePrice": 21.05, "gross": 305.0, "fees": 1.3, "netPL": 303.7, "status": "Closed", "days": 1, "notes": ""}, {"id": "MU|Call|2026-06-18|380", "stock": "MU", "setup": "Long Call", "exp": "2026-06-18", "strike": 380.0, "open": "2026-03-25", "close": "2026-03-25", "contracts": 1, "openPrice": 49.4, "closePrice": 51.0, "gross": 160.0, "fees": 1.3, "netPL": 158.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Call|2026-06-18|380|R2", "stock": "MU", "setup": "Long Call", "exp": "2026-06-18", "strike": 380.0, "open": "2026-03-25", "close": "2026-03-25", "contracts": 1, "openPrice": 49.0, "closePrice": 50.0, "gross": 100.0, "fees": 1.3, "netPL": 98.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "INTU|Put|2026-06-18|430", "stock": "INTU", "setup": "Long Put", "exp": "2026-06-18", "strike": 430.0, "open": "2026-03-26", "close": "2026-03-26", "contracts": 1, "openPrice": 38.4, "closePrice": 38.8, "gross": 40.0, "fees": 1.3, "netPL": 38.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "TSLA|Put|2026-06-18|375", "stock": "TSLA", "setup": "Long Put", "exp": "2026-06-18", "strike": 375.0, "open": "2026-03-26", "close": "2026-03-26", "contracts": 1, "openPrice": 31.1, "closePrice": 32.0, "gross": 90.0, "fees": 1.3, "netPL": 88.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "BE|Call|2026-06-18|135", "stock": "BE", "setup": "Long Call", "exp": "2026-06-18", "strike": 135.0, "open": "2026-03-26", "close": "2026-03-26", "contracts": 1, "openPrice": 30.0, "closePrice": 27.75, "gross": -225.0, "fees": 1.3, "netPL": -226.3, "status": "Closed", "days": 0, "notes": ""}, {"id": "BE|Put|2026-04-24|105", "stock": "BE", "setup": "Short Put", "exp": "2026-04-24", "strike": 105.0, "open": "2026-03-26", "close": "2026-03-30", "contracts": 1, "openPrice": 5.04, "closePrice": 7.0, "gross": -196.0, "fees": 1.3, "netPL": -197.3, "status": "Closed", "days": 4, "notes": ""}, {"id": "MU|Put|2026-06-18|360", "stock": "MU", "setup": "Long Put", "exp": "2026-06-18", "strike": 360.0, "open": "2026-03-27", "close": "2026-03-27", "contracts": 1, "openPrice": 44.1, "closePrice": 41.12, "gross": -298.0, "fees": 1.3, "netPL": -299.3, "status": "Closed", "days": 0, "notes": ""}, {"id": "BE|Put|2026-05-08|130", "stock": "BE", "setup": "Long Put", "exp": "2026-05-08", "strike": 130.0, "open": "2026-03-27", "close": "2026-03-31", "contracts": 1, "openPrice": 21.0, "closePrice": 21.5, "gross": 50.0, "fees": 1.3, "netPL": 48.7, "status": "Closed", "days": 4, "notes": ""}, {"id": "MU|Put|2026-07-17|350", "stock": "MU", "setup": "Long Put", "exp": "2026-07-17", "strike": 350.0, "open": "2026-03-30", "close": "2026-03-30", "contracts": 1, "openPrice": 51.15, "closePrice": 52.8, "gross": 165.0, "fees": 1.3, "netPL": 163.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Put|2026-07-17|350|R2", "stock": "MU", "setup": "Long Put", "exp": "2026-07-17", "strike": 350.0, "open": "2026-03-30", "close": "2026-03-30", "contracts": 1, "openPrice": 50.8, "closePrice": 52.9, "gross": 210.0, "fees": 1.3, "netPL": 208.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Call|2026-07-17|330", "stock": "MU", "setup": "Long Call", "exp": "2026-07-17", "strike": 330.0, "open": "2026-03-30", "close": "2026-03-30", "contracts": 1, "openPrice": 51.5, "closePrice": 50.05, "gross": -145.0, "fees": 1.3, "netPL": -146.3, "status": "Closed", "days": 0, "notes": ""}, {"id": "COHR|Put|2026-06-18|230", "stock": "COHR", "setup": "Long Put", "exp": "2026-06-18", "strike": 230.0, "open": "2026-03-30", "close": "2026-03-30", "contracts": 1, "openPrice": 40.9, "closePrice": 43.0, "gross": 210.0, "fees": 1.3, "netPL": 208.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "COHR|Put|2026-06-18|230|R2", "stock": "COHR", "setup": "Long Put", "exp": "2026-06-18", "strike": 230.0, "open": "2026-03-30", "close": "2026-03-30", "contracts": 1, "openPrice": 40.9, "closePrice": 43.0, "gross": 210.0, "fees": 1.3, "netPL": 208.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "COHR|Call|2026-06-18|210", "stock": "COHR", "setup": "Long Call", "exp": "2026-06-18", "strike": 210.0, "open": "2026-03-30", "close": "2026-03-30", "contracts": 1, "openPrice": 44.0, "closePrice": 45.0, "gross": 100.0, "fees": 1.3, "netPL": 98.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "NBIS|Put|2026-07-17|95", "stock": "NBIS", "setup": "Long Put", "exp": "2026-07-17", "strike": 95.0, "open": "2026-03-31", "close": "2026-03-31", "contracts": 1, "openPrice": 15.84, "closePrice": 16.8, "gross": 96.0, "fees": 1.3, "netPL": 94.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Call|2026-07-17|310", "stock": "MU", "setup": "Long Call", "exp": "2026-07-17", "strike": 310.0, "open": "2026-03-31", "close": "2026-03-31", "contracts": 1, "openPrice": 53.0, "closePrice": 58.3, "gross": 530.0, "fees": 1.3, "netPL": 528.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "BE|Put|2026-06-18|130", "stock": "BE", "setup": "Long Put", "exp": "2026-06-18", "strike": 130.0, "open": "2026-03-31", "close": "2026-03-31", "contracts": 1, "openPrice": 26.55, "closePrice": 27.3, "gross": 75.0, "fees": 1.3, "netPL": 73.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "BE|Put|2026-06-18|130|R2", "stock": "BE", "setup": "Long Put", "exp": "2026-06-18", "strike": 130.0, "open": "2026-03-31", "close": "2026-03-31", "contracts": 1, "openPrice": 27.0, "closePrice": 27.5, "gross": 50.0, "fees": 1.3, "netPL": 48.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "COHR|Put|2026-06-18|220", "stock": "COHR", "setup": "Long Put", "exp": "2026-06-18", "strike": 220.0, "open": "2026-03-31", "close": "2026-03-31", "contracts": 1, "openPrice": 36.3, "closePrice": 31.9, "gross": -440.0, "fees": 1.3, "netPL": -441.3, "status": "Closed", "days": 0, "notes": ""}, {"id": "COHR|Put|2026-06-18|240", "stock": "COHR", "setup": "Long Put", "exp": "2026-06-18", "strike": 240.0, "open": "2026-03-31", "close": "2026-03-31", "contracts": 1, "openPrice": 43.0, "closePrice": 43.5, "gross": 50.0, "fees": 1.3, "netPL": 48.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "AAOI|Call|2026-06-18|85", "stock": "AAOI", "setup": "Long Call", "exp": "2026-06-18", "strike": 85.0, "open": "2026-03-31", "close": "2026-03-31", "contracts": 1, "openPrice": 21.64, "closePrice": 20.7, "gross": -94.0, "fees": 1.3, "netPL": -95.3, "status": "Closed", "days": 0, "notes": ""}, {"id": "SNDK|Put|2026-04-17|630", "stock": "SNDK", "setup": "Long Put", "exp": "2026-04-17", "strike": 630.0, "open": "2026-03-31", "close": "2026-03-31", "contracts": 1, "openPrice": 55.6, "closePrice": 57.3, "gross": 170.0, "fees": 1.3, "netPL": 168.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Call|2026-06-18|330", "stock": "MU", "setup": "Long Call", "exp": "2026-06-18", "strike": 330.0, "open": "2026-03-31", "close": "2026-03-31", "contracts": 1, "openPrice": 43.85, "closePrice": 42.5, "gross": -135.0, "fees": 1.3, "netPL": -136.3, "status": "Closed", "days": 0, "notes": ""}, {"id": "BE|Call|2026-06-18|130", "stock": "BE", "setup": "Long Call", "exp": "2026-06-18", "strike": 130.0, "open": "2026-04-01", "close": "2026-04-01", "contracts": 1, "openPrice": 29.2, "closePrice": 31.0, "gross": 180.0, "fees": 1.3, "netPL": 178.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Put|2026-06-18|370", "stock": "MU", "setup": "Long Put", "exp": "2026-06-18", "strike": 370.0, "open": "2026-04-01", "close": "2026-04-01", "contracts": 1, "openPrice": 47.0, "closePrice": 47.5, "gross": 50.0, "fees": 1.3, "netPL": 48.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Put|2026-06-18|360|R2", "stock": "MU", "setup": "Long Put", "exp": "2026-06-18", "strike": 360.0, "open": "2026-04-01", "close": "2026-04-01", "contracts": 1, "openPrice": 45.35, "closePrice": 46.1, "gross": 75.0, "fees": 1.3, "netPL": 73.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "BE|Call|2026-06-18|135|R2", "stock": "BE", "setup": "Long Call", "exp": "2026-06-18", "strike": 135.0, "open": "2026-04-01", "close": "2026-04-01", "contracts": 1, "openPrice": 29.0, "closePrice": 30.6, "gross": 160.0, "fees": 1.3, "netPL": 158.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "NBIS|Call|2026-06-18|105", "stock": "NBIS", "setup": "Long Call", "exp": "2026-06-18", "strike": 105.0, "open": "2026-04-01", "close": "2026-04-01", "contracts": 1, "openPrice": 18.15, "closePrice": 16.25, "gross": -190.0, "fees": 1.3, "netPL": -191.3, "status": "Closed", "days": 0, "notes": ""}, {"id": "COHR|Call|2026-06-18|250", "stock": "COHR", "setup": "Long Call", "exp": "2026-06-18", "strike": 250.0, "open": "2026-04-01", "close": "2026-04-01", "contracts": 1, "openPrice": 43.5, "closePrice": 45.8, "gross": 230.0, "fees": 1.3, "netPL": 228.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "SNDK|Put|2026-06-18|690", "stock": "SNDK", "setup": "Long Put", "exp": "2026-06-18", "strike": 690.0, "open": "2026-04-01", "close": "2026-04-01", "contracts": 1, "openPrice": 121.5, "closePrice": 121.8, "gross": 30.0, "fees": 1.3, "netPL": 28.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Call|2026-05-22|350", "stock": "MU", "setup": "Long Call", "exp": "2026-05-22", "strike": 350.0, "open": "2026-04-02", "close": "2026-04-02", "contracts": 1, "openPrice": 42.8, "closePrice": 46.5, "gross": 370.0, "fees": 1.3, "netPL": 368.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "COHR|Call|2026-06-18|250|R2", "stock": "COHR", "setup": "Long Call", "exp": "2026-06-18", "strike": 250.0, "open": "2026-04-02", "close": "2026-04-02", "contracts": 1, "openPrice": 46.5, "closePrice": 48.0, "gross": 150.0, "fees": 1.3, "netPL": 148.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Call|2026-06-18|370", "stock": "MU", "setup": "Long Call", "exp": "2026-06-18", "strike": 370.0, "open": "2026-04-06", "close": "2026-04-06", "contracts": 1, "openPrice": 51.5, "closePrice": 55.0, "gross": 350.0, "fees": 1.3, "netPL": 348.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "COHR|Call|2026-06-18|260", "stock": "COHR", "setup": "Long Call", "exp": "2026-06-18", "strike": 260.0, "open": "$260.00", "close": "2026-04-06", "contracts": 1, "openPrice": 47.8, "closePrice": 41.0, "gross": -680.0, "fees": 1.3, "netPL": -681.3, "status": "Closed", "days": 45858, "notes": ""}, {"id": "BE|Call|2026-06-18|135|R3", "stock": "BE", "setup": "Long Call", "exp": "2026-06-18", "strike": 135.0, "open": "2026-04-06", "close": "2026-04-07", "contracts": 1, "openPrice": 28.0, "closePrice": 25.3, "gross": -270.0, "fees": 1.3, "netPL": -271.3, "status": "Closed", "days": 1, "notes": ""}, {"id": "MU|Put|2026-06-18|380", "stock": "MU", "setup": "Long Put", "exp": "2026-06-18", "strike": 380.0, "open": "2026-04-06", "close": "2026-04-06", "contracts": 1, "openPrice": 45.35, "closePrice": 47.0, "gross": 165.0, "fees": 1.3, "netPL": 163.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "SNDK|Put|2026-06-18|730", "stock": "SNDK", "setup": "Long Put", "exp": "2026-06-18", "strike": 730.0, "open": "2026-04-06", "close": "2026-04-06", "contracts": 1, "openPrice": 125.6, "closePrice": 128.0, "gross": 240.0, "fees": 1.3, "netPL": 238.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Put|2026-06-18|370|R2", "stock": "MU", "setup": "Long Put", "exp": "2026-06-18", "strike": 370.0, "open": "2026-04-06", "close": "2026-04-06", "contracts": 1, "openPrice": 41.25, "closePrice": 41.5, "gross": 25.0, "fees": 1.3, "netPL": 23.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "SNDK|Put|2026-06-18|730|R2", "stock": "SNDK", "setup": "Long Put", "exp": "2026-06-18", "strike": 730.0, "open": "2026-04-06", "close": "2026-04-07", "contracts": 1, "openPrice": 125.2, "closePrice": 132.0, "gross": 680.0, "fees": 1.3, "netPL": 678.7, "status": "Closed", "days": 1, "notes": ""}, {"id": "MU|Call|2026-05-22|350|R2", "stock": "MU", "setup": "Long Call", "exp": "2026-05-22", "strike": 350.0, "open": "2026-04-07", "close": "2026-04-07", "contracts": 1, "openPrice": 47.0, "closePrice": 51.0, "gross": 400.0, "fees": 1.62, "netPL": 398.38, "status": "Closed", "days": 0, "notes": ""}, {"id": "IREN|Put|2026-05-22|33", "stock": "IREN", "setup": "Long Put", "exp": "2026-05-22", "strike": 33.0, "open": "2026-04-07", "close": "2026-04-08", "contracts": 1, "openPrice": 3.7, "closePrice": 2.76, "gross": -94.0, "fees": 1.3, "netPL": -95.3, "status": "Closed", "days": 1, "notes": ""}, {"id": "MU|Put|2026-06-18|410", "stock": "MU", "setup": "Long Put", "exp": "2026-06-18", "strike": 410.0, "open": "2026-04-08", "close": "2026-04-08", "contracts": 1, "openPrice": 46.0, "closePrice": 47.95, "gross": 195.0, "fees": 1.3, "netPL": 193.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "LRCX|Put|2026-06-18|240", "stock": "LRCX", "setup": "Long Put", "exp": "2026-06-18", "strike": 240.0, "open": "2026-04-08", "close": "2026-04-08", "contracts": 1, "openPrice": 22.5, "closePrice": 24.0, "gross": 150.0, "fees": 1.3, "netPL": 148.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "BE|Put|2026-06-18|150", "stock": "BE", "setup": "Long Put", "exp": "2026-06-18", "strike": 150.0, "open": "2026-04-08", "close": "2026-04-08", "contracts": 1, "openPrice": 25.8, "closePrice": 27.25, "gross": 145.0, "fees": 1.3, "netPL": 143.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "CIEN|Put|2026-06-18|480", "stock": "CIEN", "setup": "Long Put", "exp": "2026-06-18", "strike": 480.0, "open": "2026-04-08", "close": "2026-04-08", "contracts": 1, "openPrice": 70.0, "closePrice": 68.0, "gross": -200.0, "fees": 1.3, "netPL": -201.3, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Call|2026-07-17|400", "stock": "MU", "setup": "Long Call", "exp": "2026-07-17", "strike": 400.0, "open": "2026-04-09", "close": "2026-04-09", "contracts": 1, "openPrice": 63.4, "closePrice": 59.15, "gross": -425.0, "fees": 1.3, "netPL": -426.3, "status": "Closed", "days": 0, "notes": ""}, {"id": "BE|Put|2026-06-18|150|R2", "stock": "BE", "setup": "Long Put", "exp": "2026-06-18", "strike": 150.0, "open": "2026-04-09", "close": "2026-04-13", "contracts": 1, "openPrice": 24.0, "closePrice": 20.0, "gross": -400.0, "fees": 1.3, "netPL": -401.3, "status": "Closed", "days": 4, "notes": ""}, {"id": "SNDK|Put|2026-05-29|825", "stock": "SNDK", "setup": "Long Put", "exp": "2026-05-29", "strike": 825.0, "open": "2026-04-09", "close": "2026-04-09", "contracts": 1, "openPrice": 127.0, "closePrice": 118.7, "gross": -830.0, "fees": 1.3, "netPL": -831.3, "status": "Closed", "days": 0, "notes": ""}, {"id": "NBIS|Put|2026-05-08|134", "stock": "NBIS", "setup": "Long Put", "exp": "2026-05-08", "strike": 134.0, "open": "2026-04-09", "close": "2026-04-10", "contracts": 1, "openPrice": 13.5, "closePrice": 9.2, "gross": -430.0, "fees": 1.3, "netPL": -431.3, "status": "Closed", "days": 1, "notes": ""}, {"id": "MU|Put|2026-06-18|420", "stock": "MU", "setup": "Long Put", "exp": "2026-06-18", "strike": 420.0, "open": "2026-04-10", "close": "2026-04-10", "contracts": 1, "openPrice": 48.0, "closePrice": 48.5, "gross": 50.0, "fees": 1.41, "netPL": 48.59, "status": "Closed", "days": 0, "notes": ""}, {"id": "AAOI|Put|2026-05-29|150", "stock": "AAOI", "setup": "Long Put", "exp": "2026-05-29", "strike": 150.0, "open": "2026-04-10", "close": "2026-04-10", "contracts": 1, "openPrice": 31.0, "closePrice": 32.0, "gross": 100.0, "fees": 1.39, "netPL": 98.61, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Call|2026-06-18|420|R2", "stock": "MU", "setup": "Long Call", "exp": "2026-06-18", "strike": 420.0, "open": "2026-04-10", "close": "2026-04-10", "contracts": 1, "openPrice": 42.0, "closePrice": 42.9, "gross": 90.0, "fees": 1.3, "netPL": 88.7, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Call|2026-05-29|420", "stock": "MU", "setup": "Long Call", "exp": "2026-05-29", "strike": 420.0, "open": "2026-04-10", "close": "2026-04-10", "contracts": 1, "openPrice": 41.0, "closePrice": 41.5, "gross": 50.0, "fees": 1.41, "netPL": 48.59, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Call|2026-05-29|410", "stock": "MU", "setup": "Long Call", "exp": "2026-05-29", "strike": 410.0, "open": "2026-04-13", "close": "2026-04-13", "contracts": 1, "openPrice": 43.9, "closePrice": 46.0, "gross": 210.0, "fees": 1.41, "netPL": 208.59, "status": "Closed", "days": 0, "notes": ""}, {"id": "MRVL|Call|2026-05-15|130", "stock": "MRVL", "setup": "Long Call", "exp": "2026-05-15", "strike": 130.0, "open": "2026-04-13", "close": "2026-04-13", "contracts": 2, "openPrice": 10.5, "closePrice": 11.1, "gross": 120.0, "fees": 1.41, "netPL": 118.59, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Call|2026-05-29|410|R2", "stock": "MU", "setup": "Long Call", "exp": "2026-05-29", "strike": 410.0, "open": "2026-04-13", "close": "2026-04-13", "contracts": 1, "openPrice": 42.8, "closePrice": 45.0, "gross": 220.0, "fees": 1.41, "netPL": 218.59, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Call|2026-05-29|430", "stock": "MU", "setup": "Long Call", "exp": "2026-05-29", "strike": 430.0, "open": "2026-04-14", "close": "2026-04-14", "contracts": 1, "openPrice": 41.0, "closePrice": 43.5, "gross": 250.0, "fees": 1.41, "netPL": 248.59, "status": "Closed", "days": 0, "notes": ""}, {"id": "BE|Put|2026-05-29|200", "stock": "BE", "setup": "Long Put", "exp": "2026-05-29", "strike": 200.0, "open": "2026-04-14", "close": "2026-04-14", "contracts": 1, "openPrice": 29.0, "closePrice": 23.65, "gross": -535.0, "fees": 1.41, "netPL": -536.41, "status": "Closed", "days": 0, "notes": ""}, {"id": "NBIS|Call|2026-05-29|160", "stock": "NBIS", "setup": "Long Call", "exp": "2026-05-29", "strike": 160.0, "open": "2026-04-14", "close": "2026-04-14", "contracts": 1, "openPrice": 21.0, "closePrice": 21.5, "gross": 50.0, "fees": 1.37, "netPL": 48.63, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Put|2026-05-22|435", "stock": "MU", "setup": "Long Put", "exp": "2026-05-22", "strike": 435.0, "open": "2026-04-14", "close": "2026-04-14", "contracts": 1, "openPrice": 36.8, "closePrice": 37.5, "gross": 70.0, "fees": 1.41, "netPL": 68.59, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Put|2026-05-22|435|R2", "stock": "MU", "setup": "Long Put", "exp": "2026-05-22", "strike": 435.0, "open": "2026-04-14", "close": "2026-04-14", "contracts": 1, "openPrice": 36.7, "closePrice": 37.5, "gross": 80.0, "fees": 1.41, "netPL": 78.59, "status": "Closed", "days": 0, "notes": ""}, {"id": "BE|Put|2026-05-22|210", "stock": "BE", "setup": "Long Put", "exp": "2026-05-22", "strike": 210.0, "open": "2026-04-14", "close": "2026-04-14", "contracts": 1, "openPrice": 29.0, "closePrice": 27.35, "gross": -165.0, "fees": 1.41, "netPL": -166.41, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Call|2026-05-22|435", "stock": "MU", "setup": "Long Call", "exp": "2026-05-22", "strike": 435.0, "open": "2026-04-14", "close": "2026-04-14", "contracts": 1, "openPrice": 41.0, "closePrice": 41.9, "gross": 90.0, "fees": 1.41, "netPL": 88.59, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Put|2026-05-22|435|R3", "stock": "MU", "setup": "Long Put", "exp": "2026-05-22", "strike": 435.0, "open": "2026-04-14", "close": "2026-04-14", "contracts": 1, "openPrice": 36.5, "closePrice": 35.2, "gross": -130.0, "fees": 1.41, "netPL": -131.41, "status": "Closed", "days": 0, "notes": ""}, {"id": "SNDK|Call|2026-05-08|930", "stock": "SNDK", "setup": "Long Call", "exp": "2026-05-08", "strike": 930.0, "open": "2026-04-14", "close": "2026-04-14", "contracts": 1, "openPrice": 117.5, "closePrice": 118.0, "gross": 50.0, "fees": 1.59, "netPL": 48.41, "status": "Closed", "days": 0, "notes": ""}, {"id": "MU|Call|2026-05-22|460", "stock": "MU", "setup": "Long Call", "exp": "2026-05-22", "strike": 460.0, "open": "2026-04-15", "close": "", "contracts": 1, "openPrice": 42.0, "closePrice": null, "gross": null, "fees": 1.41, "netPL": null, "status": "Open", "days": 2, "notes": ""}, {"id": "SNDK|Call|2026-05-22|910", "stock": "SNDK", "setup": "Long Call", "exp": "2026-05-22", "strike": 910.0, "open": "2026-04-15", "close": "2026-04-15", "contracts": 1, "openPrice": 125.0, "closePrice": 113.0, "gross": -1200.0, "fees": 1.58, "netPL": -1201.58, "status": "Closed", "days": 0, "notes": ""}, {"id": "SNDK|Call|2026-05-15|890", "stock": "SNDK", "setup": "Long Call", "exp": "2026-05-15", "strike": 890.0, "open": "2026-04-15", "close": "2026-04-16", "contracts": 1, "openPrice": 121.5, "closePrice": 134.0, "gross": 1250.0, "fees": 1.62, "netPL": 1248.38, "status": "Closed", "days": 1, "notes": ""}, {"id": "CIEN|Call|2026-05-22|475", "stock": "CIEN", "setup": "Long Call", "exp": "2026-05-22", "strike": 475.0, "open": "2026-04-16", "close": "2026-04-16", "contracts": 1, "openPrice": 56.0, "closePrice": 60.3, "gross": 430.0, "fees": 1.46, "netPL": 428.54, "status": "Closed", "days": 0, "notes": ""}, {"id": "AAOI|Call|2026-05-22|155", "stock": "AAOI", "setup": "Long Call", "exp": "2026-05-22", "strike": 155.0, "open": "2026-04-16", "close": "", "contracts": 1, "openPrice": 32.6, "closePrice": null, "gross": null, "fees": null, "netPL": null, "status": "Open", "days": 1, "notes": ""}];
+
+let trades = [];
+let dbAvailable = false;
+
+// ── Supabase helpers ──────────────────────────────────────────────────────────
+function tradeToRow(t) {
+  return {
+    id: t.id, stock: t.stock, setup: t.setup, exp: t.exp,
+    strike: t.strike, open_date: t.open, close_date: t.close||null,
+    contracts: t.contracts, open_price: t.openPrice,
+    close_price: t.closePrice, gross: t.gross, fees: t.fees,
+    net_pl: t.netPL, status: t.status, days: t.days, notes: t.notes||''
+  };
+}
+
+function rowToTrade(r) {
+  return {
+    id: r.id, stock: r.stock, setup: r.setup, exp: r.exp,
+    strike: r.strike, open: r.open_date, close: r.close_date||'',
+    contracts: r.contracts, openPrice: r.open_price,
+    closePrice: r.close_price, gross: r.gross, fees: r.fees,
+    netPL: r.net_pl, status: r.status, days: r.days, notes: r.notes||''
+  };
+}
+
+async function sbFetch(path, opts={}) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    ...opts,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': opts.prefer || '',
+      ...opts.headers
+    }
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function loadFromDB() {
+  try {
+    showStatus('Loading trades from cloud...', 'info');
+    const rows = await sbFetch('trades?select=*&order=created_at.asc');
+    if (rows && rows.length > 0) {
+      trades = rows.map(rowToTrade);
+      dbAvailable = true;
+      showStatus('✓ ' + trades.length + ' trades loaded from cloud', 'success');
+    } else {
+      // DB is empty — seed it with existing data
+      dbAvailable = true;
+      showStatus('First run — uploading ' + SEED_TRADES.length + ' trades to cloud...', 'info');
+      await seedDB();
+    }
+  } catch(e) {
+    console.error('DB load failed:', e);
+    dbAvailable = false;
+    trades = [...SEED_TRADES];
+    showStatus('⚠ Offline mode — changes won\'t sync', 'warn');
+  }
+  render();
+}
+
+async function seedDB() {
+  const rows = SEED_TRADES.map(tradeToRow);
+  // Insert in batches of 50
+  for (let i=0; i<rows.length; i+=50) {
+    await sbFetch('trades', {
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: JSON.stringify(rows.slice(i, i+50))
+    });
+  }
+  trades = [...SEED_TRADES];
+  showStatus('✓ ' + trades.length + ' trades synced to cloud', 'success');
+}
+
+async function saveTrade(t) {
+  if (!dbAvailable) return;
+  try {
+    await sbFetch('trades?id=eq.' + encodeURIComponent(t.id), {
+      method: 'DELETE', prefer: 'return=minimal'
+    });
+    await sbFetch('trades', {
+      method: 'POST', prefer: 'return=minimal',
+      body: JSON.stringify(tradeToRow(t))
+    });
+  } catch(e) { console.error('Save failed:', e); showStatus('⚠ Save failed: ' + e.message, 'error'); }
+}
+
+async function deleteTrade_db(id) {
+  if (!dbAvailable) return;
+  try {
+    await sbFetch('trades?id=eq.' + encodeURIComponent(id), {
+      method: 'DELETE', prefer: 'return=minimal'
+    });
+  } catch(e) { console.error('Delete failed:', e); }
+}
+
+function showStatus(msg, type) {
+  let el = document.getElementById('sync-status');
+  if (!el) return;
+  const colors = {info:'#58a6ff', success:'#00d084', warn:'#f0a500', error:'#ff5555'};
+  el.textContent = msg;
+  el.style.color = colors[type]||'#8b949e';
+  if (type==='success') setTimeout(()=>{if(el.textContent===msg) el.textContent='';}, 3000);
+}
+
+// ── Utility ──────────────────────────────────────────────────────────────────
+function fmt(v) { if(v===null||v===undefined) return '&#8212;'; return v >= 0 ? '+$'+v.toFixed(2) : '-$'+Math.abs(v).toFixed(2); }
+function fmtN(v) { if(v===null||v===undefined) return '&#8212;'; return v >= 0 ? '$'+v.toFixed(2) : '-$'+Math.abs(v).toFixed(2); }
+function hasVal(v) { return v !== null && v !== undefined; }
+const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function fmtDate(d) {
+  if (!d) return '&#8212;';
+  const parts = d.split('-');
+  if (parts.length !== 3) return d;
+  const mi = parseInt(parts[1],10)-1;
+  if (mi<0||mi>11) return d;
+  return parts[2]+'-'+MONTHS[mi]+'-'+parts[0];
+}
+
+let charts = {};
+function destroyChart(id) { if(charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function computeStats() {
+  const closed = trades.filter(t => t.status==='Closed' && t.netPL!==null);
+  const all = trades.filter(t => t.netPL!==null);
+  const totalNet = all.reduce((s,t)=>s+t.netPL,0);
+  const wins = closed.filter(t=>t.netPL>0), losses = closed.filter(t=>t.netPL<0);
+  const allWins = all.filter(t=>t.netPL>0);
+  const allLosses = all.filter(t=>t.netPL<0);
+  return {
+    totalNet, closedCount: closed.length, openCount: trades.filter(t=>t.status==='Open').length,
+    expiredCount: trades.filter(t=>t.status==='Expired').length,
+    assignedCount: trades.filter(t=>t.status==='Assigned').length,
+    totalTrades: trades.length, winRate: closed.length ? wins.length/closed.length : 0,
+    avgWin: wins.length ? wins.reduce((s,t)=>s+t.netPL,0)/wins.length : 0,
+    avgLoss: losses.length ? losses.reduce((s,t)=>s+t.netPL,0)/losses.length : 0,
+    best: all.length ? Math.max(...all.map(t=>t.netPL)) : 0,
+    worst: all.length ? Math.min(...all.map(t=>t.netPL)) : 0,
+    totalProfit: allWins.reduce((s,t)=>s+t.netPL,0),
+    totalLoss: allLosses.reduce((s,t)=>s+t.netPL,0)
+  };
+}
+
+function animateCounter(el, target, prefix='$', isInt=false) {
+  const duration = 800, steps = 40, increment = target / steps;
+  let current = 0, step = 0;
+  const timer = setInterval(() => {
+    step++;
+    current = step >= steps ? target : current + increment;
+    const val = isInt ? Math.round(current) : parseFloat(current.toFixed(2));
+    const neg = val < 0;
+    el.textContent = (neg ? '-' : '') + prefix + Math.abs(val).toFixed(isInt ? 0 : 2);
+    if (step >= steps) clearInterval(timer);
+  }, duration / steps);
+}
+
+function renderMetrics() {
+  const s = computeStats();
+
+  const countMetrics = [
+    {label:'Total trades', val:s.totalTrades, cls:'neu', accent:'#bc8cff'},
+    {label:'Closed trades', val:s.closedCount, cls:'neu', accent:'#00d084'},
+    {label:'Open trades', val:s.openCount, cls:'neu', accent:'#bc8cff'},
+    {label:'Expired trades', val:s.expiredCount, cls:'neu', accent:'#58a6ff'},
+    {label:'Assigned trades', val:s.assignedCount, cls:'neu', accent:'#f0a500'},
+  ];
+
+  const perfMetrics = [
+    {label:'Total net P&L', val:fmtN(s.totalNet), cls:s.totalNet>=0?'pos':'neg', accent:s.totalNet>=0?'#00d084':'#ff5555', animate:true, target:s.totalNet},
+    {label:'Total profit', val:fmtN(s.totalProfit), cls:'pos', accent:'#00d084', animate:true, target:s.totalProfit},
+    {label:'Total loss', val:fmtN(s.totalLoss), cls:'neg', accent:'#ff5555', animate:true, target:s.totalLoss},
+    {label:'Win rate (closed)', val:(s.winRate*100).toFixed(1)+'%', cls:'neu', accent:'#58a6ff'},
+    {label:'Avg win', val:fmtN(s.avgWin), cls:'pos', accent:'#00d084', animate:true, target:s.avgWin},
+    {label:'Avg loss', val:fmtN(s.avgLoss), cls:'neg', accent:'#ff5555', animate:true, target:s.avgLoss},
+    {label:'Best trade', val:fmtN(s.best), cls:'pos', accent:'#39d0d8', animate:true, target:s.best},
+    {label:'Worst trade', val:fmtN(s.worst), cls:'neg', accent:'#ff5555', animate:true, target:s.worst},
+  ];
+
+  const makeCard = (m, i, prefix) =>
+    `<div class="metric-card" style="--accent:${m.accent}"><div class="metric-label">${m.label}</div><div class="metric-value ${m.cls}" id="${prefix}-${i}">${m.val}</div></div>`;
+
+  document.getElementById('metric-grid-counts').innerHTML = countMetrics.map((m,i)=>makeCard(m,i,'mc')).join('');
+  document.getElementById('metric-grid-perf').innerHTML = perfMetrics.map((m,i)=>makeCard(m,i,'mp')).join('');
+
+  // Animate dollar values
+  perfMetrics.forEach((m,i) => {
+    if (m.animate && hasVal(m.target)) {
+      const el = document.getElementById('mp-'+i);
+      if (el) animateCounter(el, m.target);
+    }
+  });
+}
+
+// ── Cumulative chart ──────────────────────────────────────────────────────────
+let cumulView = 'all';
+function setCumulView(v) {
+  cumulView = v;
+  document.querySelectorAll('.chart-toggle').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tog-'+v).classList.add('active');
+  renderCumulChart();
+}
+function getWeekKey(dateStr) {
+  const d = new Date(dateStr); const day = d.getDay();
+  const monday = new Date(d); monday.setDate(d.getDate()-(day===0?6:day-1));
+  return monday.toISOString().slice(0,10);
+}
+function renderCumulChart() {
+  destroyChart('cumul');
+  const sorted = trades.filter(t=>t.netPL!==null).sort((a,b)=>new Date(a.close||a.exp)-new Date(b.close||b.exp));
+  let labels=[], data=[];
+  if (cumulView==='all') {
+    let cum=0; sorted.forEach(t=>{ cum+=t.netPL; labels.push(fmtDate(t.close||t.exp)); data.push(parseFloat(cum.toFixed(2))); });
+  } else if (cumulView==='daily') {
+    const daily={}; sorted.forEach(t=>{ const d=t.close||t.exp; if(!daily[d]) daily[d]=0; daily[d]+=t.netPL; });
+    let cum=0; Object.keys(daily).sort().forEach(d=>{ cum+=daily[d]; labels.push(fmtDate(d)); data.push(parseFloat(cum.toFixed(2))); });
+  } else {
+    const weekly={}; sorted.forEach(t=>{ const wk=getWeekKey(t.close||t.exp); if(!weekly[wk]) weekly[wk]=0; weekly[wk]+=t.netPL; });
+    let cum=0; Object.keys(weekly).sort().forEach(wk=>{ cum+=weekly[wk]; labels.push('Wk '+fmtDate(wk)); data.push(parseFloat(cum.toFixed(2))); });
+  }
+  charts['cumul']=new Chart(document.getElementById('cumulChart'),{
+    type:'line',
+    data:{labels,datasets:[{label:'Cumulative P&L',data,borderColor:'#00d084',backgroundColor:'rgba(0,208,132,0.07)',borderWidth:2,pointRadius:cumulView==='weekly'?5:cumulView==='daily'?4:3,pointHoverRadius:7,pointBackgroundColor:'#00d084',pointBorderColor:'#0d1117',pointBorderWidth:2,fill:true,tension:0.3}]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{enabled:false,external:(ctx)=>{
+        let el=document.getElementById('cumul-tooltip');
+        if(!el){el=document.createElement('div');el.id='cumul-tooltip';el.style.cssText='position:absolute;pointer-events:none;z-index:99;';document.getElementById('cumulChart').parentNode.appendChild(el);}
+        const {tooltip}=ctx;
+        if(tooltip.opacity===0){el.style.opacity=0;return;}
+        const dp=tooltip.dataPoints[0];
+        const prev=dp.dataIndex>0?dp.dataset.data[dp.dataIndex-1]:0;
+        const diff=dp.parsed.y-prev;
+        const diffColor=diff>=0?'#00d084':'#ff5555';
+        el.innerHTML=`<div style="background:#1e2530;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px 12px;font-family:Montserrat,sans-serif;min-width:130px;"><div style="font-size:11px;color:#8b949e;margin-bottom:4px;">${dp.label}</div><div style="font-size:14px;font-weight:700;color:#00d084;">${fmtN(dp.parsed.y)}</div><div style="font-size:12px;font-weight:600;color:${diffColor};margin-top:2px;">${(diff>=0?'+':'')+fmtN(diff)}</div></div>`;
+        el.style.opacity=1;
+        el.style.left=(tooltip.caretX+12)+'px'; el.style.top=(tooltip.caretY-20)+'px';
+      }}},
+      scales:{
+        x:{ticks:{maxTicksLimit:cumulView==='weekly'?12:10,font:{size:11,family:'Montserrat'},color:'#8b949e'},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{callback:v=>'$'+v.toFixed(0),font:{size:11,family:'Montserrat'},color:'#8b949e'},grid:{color:'rgba(255,255,255,0.04)'}}
+      }
+    }
+  });
+}
+
+function renderWinChart() {
+  destroyChart('win');
+  const closed=trades.filter(t=>t.status==='Closed'&&t.netPL!==null);
+  const wins=closed.filter(t=>t.netPL>0).length, losses=closed.filter(t=>t.netPL<0).length;
+  const expired=trades.filter(t=>t.status==='Expired').length, assigned=trades.filter(t=>t.status==='Assigned').length;
+  document.getElementById('winleg').innerHTML=[{c:'#00d084',l:`Wins (${wins})`},{c:'#ff5555',l:`Losses (${losses})`},{c:'#58a6ff',l:`Expired (${expired})`},{c:'#f0a500',l:`Assigned (${assigned})`}].map(x=>`<span><span class="legend-dot" style="background:${x.c}"></span>${x.l}</span>`).join('');
+  charts['win']=new Chart(document.getElementById('winChart'),{type:'doughnut',data:{labels:['Wins','Losses','Expired','Assigned'],datasets:[{data:[wins,losses,expired,assigned],backgroundColor:['#00d084','#ff5555','#58a6ff','#f0a500'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+}
+
+function renderSetupChart() {
+  destroyChart('setup');
+  const setups={};
+  trades.forEach(t=>{if(!setups[t.setup])setups[t.setup]={pl:0,count:0};setups[t.setup].pl+=(t.netPL||0);setups[t.setup].count++;});
+  const labels=Object.keys(setups),data=labels.map(l=>parseFloat(setups[l].pl.toFixed(2)));
+  document.getElementById('setupleg').innerHTML=[{c:'#00d084',l:'Positive'},{c:'#ff5555',l:'Negative'}].map(x=>`<span><span class="legend-dot" style="background:${x.c}"></span>${x.l}</span>`).join('');
+  charts['setup']=new Chart(document.getElementById('setupChart'),{type:'bar',data:{labels,datasets:[{label:'Net P&L',data,backgroundColor:data.map(v=>v>=0?'#00d084':'#ff5555'),borderWidth:0,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b949e'},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{callback:v=>'$'+v.toFixed(0),color:'#8b949e'},grid:{color:'rgba(255,255,255,0.05)'}}}}});
+}
+
+function renderMonthlyChart() {
+  destroyChart('monthly');
+  const monthly={};
+  trades.filter(t=>t.netPL!==null).forEach(t=>{
+    const d=t.close||t.exp||t.open; if(!d) return;
+    const key=d.slice(0,7);
+    if(!monthly[key]) monthly[key]=0;
+    monthly[key]+=t.netPL;
+  });
+  const sorted=Object.keys(monthly).sort();
+  const labels=sorted.map(k=>{ const [yr,mo]=k.split('-'); return MONTHS[parseInt(mo,10)-1]+' '+yr.slice(2); });
+  const data=sorted.map(k=>parseFloat(monthly[k].toFixed(2)));
+  charts['monthly']=new Chart(document.getElementById('monthlyChart'),{
+    type:'bar',
+    data:{labels,datasets:[{label:'Monthly net P&L',data,backgroundColor:data.map(v=>v>=0?'rgba(0,208,132,0.8)':'rgba(255,85,85,0.8)'),borderWidth:0,borderRadius:5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:ctx=>' '+fmtN(ctx.parsed.y)},backgroundColor:'#1e2530',bodyColor:'#e6edf3',titleColor:'#8b949e',borderColor:'rgba(255,255,255,0.1)',borderWidth:1}},
+      scales:{x:{ticks:{color:'#8b949e',font:{size:12}},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{callback:v=>'$'+v.toFixed(0),color:'#8b949e'},grid:{color:'rgba(255,255,255,0.04)'}}}}
+  });
+}
+
+// ── Daily ─────────────────────────────────────────────────────────────────────
+let selectedMonths = new Set();
+let dailySort = {col:'date', dir:'desc'};
+
+function buildMonthFilter() {
+  const daily = {};
+  trades.filter(t=>t.netPL!==null).forEach(t=>{
+    const d = t.close||t.exp||t.open;
+    if (d) { const key = d.slice(0,7); daily[key] = (daily[key]||0) + t.netPL; }
+  });
+  const months = Object.keys(daily).sort();
+  const el = document.getElementById('month-filter-btns');
+  if (!el) return;
+  el.innerHTML = months.map(m => {
+    const [yr, mo] = m.split('-');
+    const label = MONTHS[parseInt(mo,10)-1] + ' ' + yr;
+    const pl = daily[m];
+    const active = selectedMonths.has(m) ? ' active' : '';
+    return `<button class="month-btn${active}" onclick="toggleMonth('${m}')" style="border-color:${pl>=0?'rgba(0,208,132,0.3)':'rgba(255,85,85,0.3)'};color:${selectedMonths.has(m)?'#fff':pl>=0?'#00d084':'#ff5555'};">${label}<span style="margin-left:6px;font-size:12px;opacity:0.8;">${pl>=0?'+':''}$${Math.round(pl)}</span></button>`;
+  }).join('');
+}
+function toggleMonth(m) { if(selectedMonths.has(m)) selectedMonths.delete(m); else selectedMonths.add(m); buildMonthFilter(); renderDailyChart(); renderDailyTable(); }
+function clearMonthFilter() { selectedMonths.clear(); buildMonthFilter(); renderDailyChart(); renderDailyTable(); }
+function getFilteredDailyDates() { if(selectedMonths.size===0) return null; return d=>selectedMonths.has(d.slice(0,7)); }
+
+function sortDaily(col) {
+  if(dailySort.col===col) dailySort.dir=dailySort.dir==='asc'?'desc':'asc';
+  else {dailySort.col=col;dailySort.dir='desc';}
+  renderDailyTable();
+}
+
+function renderDailyChart() {
+  destroyChart('daily');
+  const filter=getFilteredDailyDates();
+  const daily={};
+  trades.filter(t=>t.netPL!==null).forEach(t=>{const d=t.close||t.exp||t.open;if(!d) return; if(filter&&!filter(d)) return; if(!daily[d])daily[d]=0;daily[d]+=t.netPL;});
+  const sortedKeys=Object.keys(daily).sort();
+  const labels=sortedKeys.map(d=>fmtDate(d)),data=sortedKeys.map(l=>parseFloat(daily[l].toFixed(2)));
+  charts['daily']=new Chart(document.getElementById('dailyChart'),{type:'bar',data:{labels,datasets:[{label:'Daily net P&L',data,backgroundColor:data.map(v=>v>=0?'#00d084':'#ff5555'),borderWidth:0,borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:12,font:{size:12},color:'#8b949e'},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{callback:v=>'$'+v.toFixed(0),color:'#8b949e'},grid:{color:'rgba(255,255,255,0.05)'}}}}});
+}
+
+function renderDailyTable() {
+  const cols=[{key:'date',label:'Date'},{key:'pl',label:'Daily net P&L'},{key:'count',label:'# Trades'},{key:'best',label:'Biggest winner',nosort:true},{key:'worst',label:'Biggest loser',nosort:true},{key:'',label:'',nosort:true}];
+  document.getElementById('daily-thead').innerHTML='<tr>'+cols.map(c=>c.nosort?`<th>${c.label}</th>`:`<th class="sortable${dailySort.col===c.key?' sort-'+dailySort.dir:''}" onclick="sortDaily('${c.key}')">${c.label}</th>`).join('')+'</tr>';
+  const filter=getFilteredDailyDates();
+  const daily={};
+  trades.filter(t=>t.netPL!==null).forEach(t=>{
+    const d=t.close||t.exp||t.open;
+    if(!d) return; if(filter&&!filter(d)) return;
+    if(!daily[d]) daily[d]={pl:0,count:0,best:{netPL:-Infinity,stock:''},worst:{netPL:Infinity,stock:''},date:d};
+    daily[d].pl+=t.netPL;daily[d].count++;
+    if(t.netPL>daily[d].best.netPL) daily[d].best={netPL:t.netPL,stock:t.stock};
+    if(t.netPL<daily[d].worst.netPL) daily[d].worst={netPL:t.netPL,stock:t.stock};
+  });
+  let rows=Object.values(daily);
+  rows.sort((a,b)=>{
+    const av=a[dailySort.col],bv=b[dailySort.col];
+    if(typeof av==='string') return dailySort.dir==='asc'?av.localeCompare(bv):bv.localeCompare(av);
+    return dailySort.dir==='asc'?av-bv:bv-av;
+  });
+  document.getElementById('daily-tbody').innerHTML=rows.map(r=>`<tr style="cursor:pointer;" onclick="openDailyModal('${r.date}')" title="Click to see trades on ${fmtDate(r.date)}"><td>${fmtDate(r.date)}</td><td class="${r.pl>=0?'pos':'neg'}">${fmt(r.pl)}</td><td>${r.count}</td><td>${r.best.stock} (${fmt(r.best.netPL)})</td><td>${r.worst.stock} (${fmt(r.worst.netPL)})</td><td style="color:var(--text2);font-size:12px;">View ›</td></tr>`).join('');
+}
+
+// ── Stock ─────────────────────────────────────────────────────────────────────
+let stockSort = {col:'pl', dir:'desc'};
+function sortStock(col) {
+  if(stockSort.col===col) stockSort.dir=stockSort.dir==='asc'?'desc':'asc';
+  else {stockSort.col=col;stockSort.dir='desc';}
+  renderStockTable();
+}
+function renderStockTable() {
+  const cols=[{key:'stock',label:'Stock'},{key:'pl',label:'Net P&L'},{key:'count',label:'# Trades'},{key:'avg',label:'Avg P&L / trade'},{key:'',label:'',nosort:true}];
+  document.getElementById('stock-thead').innerHTML='<tr>'+cols.map(c=>c.nosort||!c.key?`<th></th>`:`<th class="sortable${stockSort.col===c.key?' sort-'+stockSort.dir:''}" onclick="sortStock('${c.key}')">${c.label}</th>`).join('')+'</tr>';
+  const stocks={};
+  trades.forEach(t=>{if(!stocks[t.stock])stocks[t.stock]={pl:0,count:0};stocks[t.stock].pl+=(t.netPL||0);stocks[t.stock].count++;});
+  let sorted=Object.entries(stocks).map(([stock,s])=>{return {stock,pl:s.pl,count:s.count,avg:s.pl/s.count};});
+  sorted.sort((a,b)=>{
+    const av=a[stockSort.col],bv=b[stockSort.col];
+    if(typeof av==='string') return stockSort.dir==='asc'?av.localeCompare(bv):bv.localeCompare(av);
+    return stockSort.dir==='asc'?av-bv:bv-av;
+  });
+  document.getElementById('stock-tbody').innerHTML=sorted.map(s=>`<tr style="cursor:pointer;" onclick="openStockModal('${s.stock}')" title="Click to see all ${s.stock} trades"><td><strong style="color:var(--blue);">${s.stock}</strong></td><td class="${s.pl>=0?'pos':'neg'}">${fmt(s.pl)}</td><td>${s.count}</td><td class="${s.avg>=0?'pos':'neg'}">${fmt(s.avg)}</td><td style="color:var(--text2);font-size:12px;">View trades ›</td></tr>`).join('');
+}
+function renderStockChart() {
+  destroyChart('stock');
+  const stocks={};
+  trades.forEach(t=>{if(!stocks[t.stock])stocks[t.stock]={pl:0,count:0};stocks[t.stock].pl+=(t.netPL||0);stocks[t.stock].count++;});
+  const sorted=Object.entries(stocks).sort((a,b)=>b[1].pl-a[1].pl);
+  const labels=sorted.map(s=>s[0]),data=sorted.map(s=>parseFloat(s[1].pl.toFixed(2)));
+  const h=Math.max(300,labels.length*38+80);
+  document.getElementById('stock-chart-wrap').style.height=h+'px';
+  document.getElementById('stockleg').innerHTML=[{c:'#00d084',l:'Positive'},{c:'#ff5555',l:'Negative'}].map(x=>`<span><span class="legend-dot" style="background:${x.c}"></span>${x.l}</span>`).join('');
+  charts['stock']=new Chart(document.getElementById('stockChart'),{type:'bar',data:{labels,datasets:[{label:'Net P&L',data,backgroundColor:data.map(v=>v>=0?'#00d084':'#ff5555'),borderWidth:0,borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>'$'+v.toFixed(0),color:'#8b949e'},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'#c9d1d9',font:{size:13}},grid:{color:'rgba(255,255,255,0.05)'}}}}});
+  renderStockTable();
+}
+
+// ── Stock modal ───────────────────────────────────────────────────────────────
+let stockModalSort = {col:'netPL', dir:'desc'};
+let currentStockModal = '';
+function sortStockModal(col) {
+  if(stockModalSort.col===col) stockModalSort.dir=stockModalSort.dir==='asc'?'desc':'asc';
+  else {stockModalSort.col=col;stockModalSort.dir='desc';}
+  renderStockModalTable(currentStockModal);
+}
+function renderStockModalTable(stock) {
+  const cols=[{key:'id',label:'Trade ID',nosort:true},{key:'setup',label:'Setup'},{key:'open',label:'Open'},{key:'close',label:'Close'},{key:'contracts',label:'Contracts'},{key:'openPrice',label:'Open $'},{key:'closePrice',label:'Close $'},{key:'netPL',label:'Net P&L'},{key:'status',label:'Status'},{key:'days',label:'Days'}];
+  document.getElementById('stock-modal-thead').innerHTML='<tr>'+cols.map(c=>c.nosort?`<th>${c.label}</th>`:`<th class="sortable${stockModalSort.col===c.key?' sort-'+stockModalSort.dir:''}" onclick="sortStockModal('${c.key}')">${c.label}</th>`).join('')+'</tr>';
+  let rows=trades.filter(t=>t.stock===stock);
+  rows.sort((a,b)=>{
+    let av=a[stockModalSort.col]??'',bv=b[stockModalSort.col]??'';
+    if(['netPL','openPrice','closePrice','contracts','days'].includes(stockModalSort.col)){av=parseFloat(av)||0;bv=parseFloat(bv)||0;return stockModalSort.dir==='asc'?av-bv:bv-av;}
+    av=String(av);bv=String(bv);return stockModalSort.dir==='asc'?av.localeCompare(bv):bv.localeCompare(av);
+  });
+  document.getElementById('stock-modal-tbody').innerHTML=rows.map(t=>`<tr><td style="font-size:12px;color:var(--text2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.id}">${t.id}</td><td>${t.setup}</td><td>${fmtDate(t.open)}</td><td>${t.close?fmtDate(t.close):'&#8212;'}</td><td>${t.contracts}</td><td>$${t.openPrice}</td><td>${hasVal(t.closePrice)?'$'+t.closePrice:'&#8212;'}</td><td class="${hasVal(t.netPL)&&t.netPL>=0?'pos':'neg'}">${hasVal(t.netPL)?fmt(t.netPL):'&#8212;'}</td><td><span class="badge badge-${t.status.toLowerCase()}">${t.status}</span></td><td>${t.days}</td></tr>`).join('');
+}
+function openStockModal(stock) {
+  currentStockModal=stock; stockModalSort={col:'netPL',dir:'desc'};
+  const stockTrades=trades.filter(t=>t.stock===stock);
+  const closed=stockTrades.filter(t=>t.status==='Closed'&&t.netPL!==null);
+  const allWithPL=stockTrades.filter(t=>t.netPL!==null);
+  const totalPL=allWithPL.reduce((s,t)=>s+t.netPL,0);
+  const wins=closed.filter(t=>t.netPL>0);
+  const best=allWithPL.length?Math.max(...allWithPL.map(t=>t.netPL)):0;
+  const worst=allWithPL.length?Math.min(...allWithPL.map(t=>t.netPL)):0;
+  const winRate=closed.length?(wins.length/closed.length*100).toFixed(1)+'%':'&#8212;';
+  document.getElementById('stock-modal-badge').textContent=stock;
+  document.getElementById('stock-modal-badge').style.cssText=`background:${totalPL>=0?'rgba(0,208,132,0.15)':'rgba(255,85,85,0.15)'};color:${totalPL>=0?'#00d084':'#ff5555'};border:1px solid ${totalPL>=0?'rgba(0,208,132,0.3)':'rgba(255,85,85,0.3)'};padding:4px 12px;border-radius:10px;font-size:14px;font-weight:600;`;
+  document.getElementById('stock-modal-title').textContent=`${stockTrades.length} trades · Net P&L ${fmtN(totalPL)}`;
+  document.getElementById('stock-modal-stats').innerHTML=[
+    {label:'Total trades',val:stockTrades.length,cls:''},{label:'Win rate',val:winRate,cls:''},
+    {label:'Total net P&L',val:fmtN(totalPL),cls:totalPL>=0?'pos':'neg'},
+    {label:'Best trade',val:fmtN(best),cls:'pos'},{label:'Worst trade',val:fmtN(worst),cls:'neg'},
+    {label:'Avg P&L',val:allWithPL.length?fmtN(totalPL/allWithPL.length):'&#8212;',cls:totalPL>=0?'pos':'neg'},
+  ].map(m=>`<div style="background:var(--bg3);border-radius:8px;padding:0.7rem 0.9rem;border:1px solid var(--border);"><div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">${m.label}</div><div style="font-size:16px;font-weight:700;" class="${m.cls}">${m.val}</div></div>`).join('');
+  renderStockModalTable(stock);
+  document.getElementById('stock-modal').classList.add('open');
+}
+function closeStockModal() { document.getElementById('stock-modal').classList.remove('open'); }
+
+// ── Daily modal ───────────────────────────────────────────────────────────────
+let dailyModalSort = {col:'netPL', dir:'desc'};
+let currentDailyDate = '';
+function sortDailyModal(col) {
+  if(dailyModalSort.col===col) dailyModalSort.dir=dailyModalSort.dir==='asc'?'desc':'asc';
+  else {dailyModalSort.col=col;dailyModalSort.dir='desc';}
+  renderDailyModalTable(currentDailyDate);
+}
+function renderDailyModalTable(date) {
+  const cols=[{key:'id',label:'Trade ID',nosort:true},{key:'stock',label:'Stock'},{key:'setup',label:'Setup'},{key:'open',label:'Open'},{key:'close',label:'Close'},{key:'contracts',label:'Contracts'},{key:'openPrice',label:'Open $'},{key:'closePrice',label:'Close $'},{key:'netPL',label:'Net P&L'},{key:'status',label:'Status'}];
+  document.getElementById('daily-modal-thead').innerHTML='<tr>'+cols.map(c=>c.nosort?`<th>${c.label}</th>`:`<th class="sortable${dailyModalSort.col===c.key?' sort-'+dailyModalSort.dir:''}" onclick="sortDailyModal('${c.key}')">${c.label}</th>`).join('')+'</tr>';
+  let rows=trades.filter(t=>(t.close||t.exp||t.open)===date);
+  rows.sort((a,b)=>{
+    let av=a[dailyModalSort.col]??'',bv=b[dailyModalSort.col]??'';
+    if(['netPL','openPrice','closePrice','contracts'].includes(dailyModalSort.col)){av=parseFloat(av)||0;bv=parseFloat(bv)||0;return dailyModalSort.dir==='asc'?av-bv:bv-av;}
+    av=String(av);bv=String(bv);return dailyModalSort.dir==='asc'?av.localeCompare(bv):bv.localeCompare(av);
+  });
+  document.getElementById('daily-modal-tbody').innerHTML=rows.map(t=>`<tr><td style="font-size:12px;color:var(--text2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.id}">${t.id}</td><td><strong style="color:var(--blue);">${t.stock}</strong></td><td>${t.setup}</td><td>${fmtDate(t.open)}</td><td>${t.close?fmtDate(t.close):'&#8212;'}</td><td>${t.contracts}</td><td>$${t.openPrice}</td><td>${hasVal(t.closePrice)?'$'+t.closePrice:'&#8212;'}</td><td class="${hasVal(t.netPL)&&t.netPL>=0?'pos':'neg'}">${hasVal(t.netPL)?fmt(t.netPL):'&#8212;'}</td><td><span class="badge badge-${t.status.toLowerCase()}">${t.status}</span></td></tr>`).join('');
+}
+function openDailyModal(date) {
+  currentDailyDate=date; dailyModalSort={col:'netPL',dir:'desc'};
+  const allDay=trades.filter(t=>(t.close||t.exp||t.open)===date);
+  const dayTrades=allDay.filter(t=>t.netPL!==null);
+  const totalPL=dayTrades.reduce((s,t)=>s+t.netPL,0);
+  const wins=dayTrades.filter(t=>t.netPL>0).length, losses=dayTrades.filter(t=>t.netPL<0).length;
+  const best=dayTrades.length?Math.max(...dayTrades.map(t=>t.netPL)):0;
+  const worst=dayTrades.length?Math.min(...dayTrades.map(t=>t.netPL)):0;
+  const badge=document.getElementById('daily-modal-badge');
+  badge.textContent=fmtDate(date);
+  badge.style.cssText=`background:${totalPL>=0?'rgba(0,208,132,0.15)':'rgba(255,85,85,0.15)'};color:${totalPL>=0?'#00d084':'#ff5555'};border:1px solid ${totalPL>=0?'rgba(0,208,132,0.3)':'rgba(255,85,85,0.3)'};padding:4px 12px;border-radius:10px;font-size:14px;font-weight:600;`;
+  document.getElementById('daily-modal-title').textContent=`${allDay.length} trade${allDay.length!==1?'s':''} · Net P&L ${fmtN(totalPL)}`;
+  document.getElementById('daily-modal-stats').innerHTML=[
+    {label:'Total trades',val:allDay.length,cls:''},{label:'Winners',val:wins,cls:'pos'},
+    {label:'Losers',val:losses,cls:'neg'},{label:'Total net P&L',val:fmtN(totalPL),cls:totalPL>=0?'pos':'neg'},
+    {label:'Best trade',val:fmtN(best),cls:'pos'},{label:'Worst trade',val:fmtN(worst),cls:'neg'},
+  ].map(m=>`<div style="background:var(--bg3);border-radius:8px;padding:0.7rem 0.9rem;border:1px solid var(--border);"><div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">${m.label}</div><div style="font-size:16px;font-weight:700;" class="${m.cls}">${m.val}</div></div>`).join('');
+  renderDailyModalTable(date);
+  document.getElementById('daily-modal').classList.add('open');
+}
+function closeDailyModal() { document.getElementById('daily-modal').classList.remove('open'); }
+
+// ── Trade table ───────────────────────────────────────────────────────────────
+let tradeSort = {col:'open', dir:'desc'};
+let activeStatusFilter = 'all';
+
+function setStatusFilter(status) {
+  activeStatusFilter = status;
+  // Update button styles
+  document.querySelectorAll('.status-filter-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const map = {all:0, Open:1, Closed:2, Expired:3, Assigned:4};
+  const btns = document.querySelectorAll('.status-filter-btn');
+  if (btns[map[status]]) btns[map[status]].classList.add('active');
+  renderTradeTable();
+}
+function sortTrade(col) {
+  if(tradeSort.col===col) tradeSort.dir=tradeSort.dir==='asc'?'desc':'asc';
+  else {tradeSort.col=col;tradeSort.dir='desc';}
+  renderTradeTable();
+}
+function renderTradeTable() {
+  // Update filter button counts
+  const counts = {all:trades.length, Open:0, Closed:0, Expired:0, Assigned:0};
+  trades.forEach(t=>{ if(counts[t.status]!==undefined) counts[t.status]++; });
+  const btnLabels = {all:'All', Open:'Open', Closed:'Closed', Expired:'Expired', Assigned:'Assigned'};
+  document.querySelectorAll('.status-filter-btn').forEach((btn,i)=>{
+    const keys = ['all','Open','Closed','Expired','Assigned'];
+    const k = keys[i];
+    btn.textContent = btnLabels[k] + ' (' + counts[k] + ')';
+    if (k === activeStatusFilter) btn.classList.add('active'); else btn.classList.remove('active');
+  });
+  const tradeCols=[{key:'id',label:'Trade ID'},{key:'stock',label:'Stock'},{key:'setup',label:'Setup'},{key:'open',label:'Open'},{key:'close',label:'Close'},{key:'contracts',label:'Contracts'},{key:'openPrice',label:'Open $'},{key:'closePrice',label:'Close $'},{key:'netPL',label:'Net P&L'},{key:'status',label:'Status'},{key:'days',label:'Days'},{key:'',label:'',nosort:true}];
+  document.getElementById('trade-thead').innerHTML='<tr>'+tradeCols.map(c=>c.nosort||!c.key?`<th></th>`:`<th class="sortable${tradeSort.col===c.key?' sort-'+tradeSort.dir:''}" onclick="sortTrade('${c.key}')">${c.label}</th>`).join('')+'</tr>';
+  const q=(document.getElementById('trade-search').value||'').toLowerCase();
+  let filtered=trades.filter(t=>{
+    const matchSearch = !q||[t.id,t.stock,t.setup,t.status,t.notes||''].join(' ').toLowerCase().includes(q);
+    const matchStatus = activeStatusFilter==='all' || t.status===activeStatusFilter;
+    return matchSearch && matchStatus;
+  });
+  filtered.sort((a,b)=>{
+    let av=a[tradeSort.col]??'',bv=b[tradeSort.col]??'';
+    if(['netPL','openPrice','closePrice','contracts','days'].includes(tradeSort.col)){av=parseFloat(av)||0;bv=parseFloat(bv)||0;return tradeSort.dir==='asc'?av-bv:bv-av;}
+    av=String(av);bv=String(bv);return tradeSort.dir==='asc'?av.localeCompare(bv):bv.localeCompare(av);
+  });
+  document.getElementById('trade-tbody').innerHTML=filtered.map(t=>{
+    const idx=trades.indexOf(t);
+    const isWin = hasVal(t.netPL) && t.netPL > 0;
+    const isLoss = hasVal(t.netPL) && t.netPL < 0;
+    const rowCls = isWin ? 'row-win' : isLoss ? 'row-loss' : '';
+    const hasNote = t.notes && t.notes.trim().length > 0;
+    const noteDot = hasNote ? `<span class="note-dot" title="${t.notes.replace(/"/g,"'")}"></span>` : '';
+    const isOpen = t.status === 'Open';
+    return`<tr class="${rowCls}">
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.id}">${t.id}</td>
+      <td><strong>${t.stock}</strong>${noteDot}</td>
+      <td>${t.setup}</td>
+      <td>${fmtDate(t.open)}</td>
+      <td>${t.close?fmtDate(t.close):'&#8212;'}</td>
+      <td>${t.contracts}</td>
+      <td>$${t.openPrice}</td>
+      <td>${hasVal(t.closePrice)?'$'+t.closePrice:'&#8212;'}</td>
+      <td class="${hasVal(t.netPL)&&t.netPL>=0?'pos':'neg'}">${hasVal(t.netPL)?fmt(t.netPL):'&#8212;'}</td>
+      <td><span class="badge badge-${t.status.toLowerCase()}">${t.status}</span></td>
+      <td>${t.days}</td>
+      <td><div class="action-btns">
+        ${isOpen?`<button class="quick-btn close-btn" onclick="openQuickClose(${idx})">✓ Close</button>`:''}
+        <button class="quick-btn dup-btn" onclick="duplicateTrade(${idx})">⧉ Dup</button>
+        <button class="quick-btn edit-btn" onclick="openEdit(${idx})">Edit</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+
+  // Notes tooltip
+  document.querySelectorAll('.note-dot').forEach(dot => {
+    dot.addEventListener('mouseenter', e => {
+      const tip = document.getElementById('note-tooltip');
+      tip.textContent = dot.title;
+      tip.style.display = 'block';
+      tip.style.left = (e.clientX + 12) + 'px';
+      tip.style.top = (e.clientY - 10) + 'px';
+    });
+    dot.addEventListener('mousemove', e => {
+      const tip = document.getElementById('note-tooltip');
+      tip.style.left = (e.clientX + 12) + 'px';
+      tip.style.top = (e.clientY - 10) + 'px';
+    });
+    dot.addEventListener('mouseleave', () => {
+      document.getElementById('note-tooltip').style.display = 'none';
+    });
+  });
+}
+
+// ── Edit / Add / Delete ───────────────────────────────────────────────────────
+let editIdx = -1;
+function openEdit(idx) {
+  editIdx=idx; const t=trades[idx];
+  document.getElementById('e-stock').value=t.stock;
+  document.getElementById('e-setup').value=t.setup;
+  document.getElementById('e-exp').value=t.exp;
+  document.getElementById('e-strike').value=t.strike;
+  document.getElementById('e-open').value=t.open;
+  document.getElementById('e-close').value=t.close||'';
+  document.getElementById('e-contracts').value=t.contracts;
+  document.getElementById('e-oprice').value=t.openPrice;
+  document.getElementById('e-cprice').value=t.closePrice!=null?t.closePrice:'';
+  document.getElementById('e-fees').value=t.fees;
+  document.getElementById('e-status').value=t.status;
+  document.getElementById('e-notes').value=t.notes||'';
+  document.getElementById('edit-msg').textContent='';
+  document.getElementById('edit-modal').classList.add('open');
+}
+function closeModal() { document.getElementById('edit-modal').classList.remove('open'); editIdx=-1; }
+
+async function saveEdit() {
+  if(editIdx<0) return;
+  const t=trades[editIdx];
+  const stock=document.getElementById('e-stock').value.trim().toUpperCase();
+  const setup=document.getElementById('e-setup').value;
+  const exp=document.getElementById('e-exp').value;
+  const strike=parseFloat(document.getElementById('e-strike').value);
+  const open=document.getElementById('e-open').value;
+  const close=document.getElementById('e-close').value;
+  const contracts=parseInt(document.getElementById('e-contracts').value)||1;
+  const openPrice=parseFloat(document.getElementById('e-oprice').value);
+  const cpVal=document.getElementById('e-cprice').value;
+  const closePrice=cpVal!==''?parseFloat(cpVal):null;
+  const fees=parseFloat(document.getElementById('e-fees').value)||0;
+  const status=document.getElementById('e-status').value;
+  const notes=document.getElementById('e-notes').value;
+  if(!stock||!exp||!strike||!open||!openPrice){document.getElementById('edit-msg').style.color='#ff5555';document.getElementById('edit-msg').textContent='Please fill required fields.';return;}
+  const gross=closePrice!=null?(closePrice-openPrice)*contracts*100:openPrice*contracts*100;
+  const netPL=closePrice!=null?parseFloat((gross-fees).toFixed(2)):null;
+  const days=close?Math.round((new Date(close)-new Date(open))/(1000*60*60*24)):0;
+  const updated={id:t.id,stock,setup,exp,strike,open,close:close||'',contracts,openPrice,closePrice,gross,fees,netPL,status,days,notes};
+  trades[editIdx]=updated;
+  showStatus('Saving...','info');
+  await saveTrade(updated);
+  closeModal(); render();
+}
+
+async function deleteTrade() {
+  if(editIdx<0) return;
+  if(!confirm('Delete trade "'+trades[editIdx].id+'"? This cannot be undone.')) return;
+  const id=trades[editIdx].id;
+  showStatus('Deleting...','info');
+  await deleteTrade_db(id);
+  trades.splice(editIdx,1);
+  closeModal(); render();
+}
+
+async function addTrade() {
+  const stock=document.getElementById('f-stock').value.trim().toUpperCase();
+  const setup=document.getElementById('f-setup').value;
+  const exp=document.getElementById('f-exp').value;
+  const strike=parseFloat(document.getElementById('f-strike').value);
+  const open=document.getElementById('f-open').value;
+  const close=document.getElementById('f-close').value;
+  const contracts=parseInt(document.getElementById('f-contracts').value)||1;
+  const openPrice=parseFloat(document.getElementById('f-oprice').value);
+  const closePrice=document.getElementById('f-cprice').value?parseFloat(document.getElementById('f-cprice').value):null;
+  const fees=parseFloat(document.getElementById('f-fees').value)||0;
+  const status=document.getElementById('f-status').value;
+  const notes=document.getElementById('f-notes').value;
+  const msg=document.getElementById('form-msg');
+  if(!stock||!exp||!strike||!open||!openPrice){msg.style.color='#ff5555';msg.textContent='Please fill required fields.';return;}
+  const gross=closePrice!=null?(closePrice-openPrice)*contracts*100:openPrice*contracts*100;
+  const netPL=closePrice!=null?gross-fees:null;
+  const days=close?Math.round((new Date(close)-new Date(open))/(1000*60*60*24)):0;
+  const newTrade={id:`${stock}|${setup}|${exp}|${strike}`,stock,setup,exp,strike,open,close:close||'',contracts,openPrice,closePrice,gross,fees,netPL,status,days,notes};
+  trades.push(newTrade);
+  msg.style.color='#00d084'; msg.textContent='Saving to cloud...';
+  await saveTrade(newTrade);
+  msg.textContent='✓ Trade saved!';
+  render(); setTimeout(()=>{msg.textContent='';},2000);
+}
+
+function importCSV(event) {
+  const file=event.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    let added=0, toInsert=[];
+    e.target.result.split('\n').slice(1).forEach(line=>{
+      if(!line.trim())return;
+      const c=line.split(',');
+      if(c.length<13)return;
+      const t={id:c[0]?.trim(),stock:c[1]?.trim(),setup:c[2]?.trim(),exp:c[3]?.trim(),strike:parseFloat(c[4]),open:c[5]?.trim(),close:c[6]?.trim()||'',contracts:parseInt(c[7])||1,openPrice:parseFloat(c[8]),closePrice:c[9]?.trim()?parseFloat(c[9]):null,gross:parseFloat(c[10])||0,fees:parseFloat(c[11])||0,netPL:c[12]?.trim()?parseFloat(c[12]):null,status:c[13]?.trim()||'Open',days:parseInt(c[14])||0,notes:c[15]?.trim()||''};
+      if(t.id&&!trades.find(x=>x.id===t.id)){trades.push(t);toInsert.push(t);added++;}
+    });
+    document.getElementById('csv-msg').textContent=`Importing ${added} trades...`;
+    for(const t of toInsert) await saveTrade(t);
+    document.getElementById('csv-msg').textContent=`✓ Imported ${added} new trade(s) to cloud.`;
+    render();
+  };
+  reader.readAsText(file);
+}
+
+// ── Quick close ───────────────────────────────────────────────────────────────
+let quickCloseIdx = -1;
+function openQuickClose(idx) {
+  quickCloseIdx = idx;
+  const t = trades[idx];
+  document.getElementById('qc-title').textContent = 'Close — ' + t.id;
+  document.getElementById('qc-info').innerHTML = `<strong style="color:var(--text)">${t.stock}</strong> · ${t.setup} · ${t.contracts} contract${t.contracts>1?'s':''} · Open @ $${t.openPrice}`;
+  document.getElementById('qc-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('qc-price').value = '';
+  document.getElementById('qc-status').value = 'Closed';
+  document.getElementById('qc-msg').textContent = '';
+  document.getElementById('quick-close-overlay').classList.add('open');
+}
+function closeQuickClose() {
+  document.getElementById('quick-close-overlay').classList.remove('open');
+  quickCloseIdx = -1;
+}
+async function saveQuickClose() {
+  if (quickCloseIdx < 0) return;
+  const t = trades[quickCloseIdx];
+  const closeDate = document.getElementById('qc-date').value;
+  const closePrice = parseFloat(document.getElementById('qc-price').value);
+  const status = document.getElementById('qc-status').value;
+  const msg = document.getElementById('qc-msg');
+  if (!closeDate || isNaN(closePrice)) { msg.style.color='#ff5555'; msg.textContent='Please fill in close date and price.'; return; }
+  const gross = (closePrice - t.openPrice) * t.contracts * 100;
+  const netPL = parseFloat((gross - t.fees).toFixed(2));
+  const days = Math.round((new Date(closeDate) - new Date(t.open)) / (1000*60*60*24));
+  const updated = {...t, close:closeDate, closePrice, gross, netPL, status, days};
+  trades[quickCloseIdx] = updated;
+  msg.style.color='#00d084'; msg.textContent='Saving...';
+  await saveTrade(updated);
+  closeQuickClose(); render();
+}
+
+// ── Duplicate trade ───────────────────────────────────────────────────────────
+async function duplicateTrade(idx) {
+  const t = trades[idx];
+  const newId = t.id + '|DUP' + Date.now().toString().slice(-4);
+  const dup = {...t, id:newId, open:new Date().toISOString().slice(0,10), close:'', closePrice:null, gross:null, netPL:null, status:'Open', days:0, notes:'Duplicated from '+t.id};
+  trades.push(dup);
+  showStatus('Saving duplicate...','info');
+  await saveTrade(dup);
+  render();
+  // Switch to add tab to show the new open trade
+  switchTab('trades');
+  showStatus('✓ Trade duplicated — update close details when ready','success');
+}
+
+// ── Export CSV ────────────────────────────────────────────────────────────────
+function exportCSV() {
+  const headers = ['Trade ID','Stock','Trade Setup','Expiration','Strike','Open Date','Close Date','Contracts','Open Price/Contract ($)','Close Price/Contract ($)','Gross P&L ($)','Fees ($)','Net P&L After Fees ($)','Status','Days Held','Notes'];
+  const rows = trades.map(t => [
+    t.id, t.stock, t.setup, t.exp, t.strike,
+    t.open, t.close||'', t.contracts, t.openPrice,
+    t.closePrice??'', t.gross??'', t.fees, t.netPL??'',
+    t.status, t.days, (t.notes||'').replace(/,/g,';')
+  ]);
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'options_trades_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ── Render & tabs ─────────────────────────────────────────────────────────────
+function render() { renderMetrics();renderCumulChart();renderWinChart();renderSetupChart();renderMonthlyChart();renderDailyChart();renderDailyTable();renderStockChart();renderTradeTable();buildMonthFilter(); }
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['overview','daily','stocks','trades','add'][i]===name));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  setTimeout(()=>{render();},50);
+}
+
+// ── PIN lock ──────────────────────────────────────────────────────────────────
+const CORRECT_PIN = '1209';
+let pinEntry = '';
+
+function pinPress(digit) {
+  if (pinEntry.length >= 4) return;
+  pinEntry += digit;
+  updatePinDots();
+  if (pinEntry.length === 4) {
+    setTimeout(checkPin, 150);
+  }
+}
+
+function pinDel() {
+  pinEntry = pinEntry.slice(0, -1);
+  updatePinDots();
+  document.getElementById('pin-error').textContent = '';
+}
+
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('d'+i).classList.toggle('filled', i < pinEntry.length);
+  }
+}
+
+function checkPin() {
+  if (pinEntry === CORRECT_PIN) {
+    const overlay = document.getElementById('pin-overlay');
+    overlay.style.transition = 'opacity 0.3s';
+    overlay.style.opacity = '0';
+    setTimeout(() => overlay.remove(), 300);
+    loadFromDB();
+  } else {
+    document.getElementById('pin-error').textContent = 'Incorrect PIN. Try again.';
+    pinEntry = '';
+    updatePinDots();
+    // Shake animation
+    const box = document.getElementById('pin-box');
+    box.style.animation = 'none';
+    box.style.transform = 'translateX(-8px)';
+    setTimeout(() => box.style.transform = 'translateX(8px)', 80);
+    setTimeout(() => box.style.transform = 'translateX(-4px)', 160);
+    setTimeout(() => box.style.transform = 'translateX(0)', 240);
+  }
+}
+
+// Allow keyboard input too
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('pin-overlay')) return;
+  if (e.key >= '0' && e.key <= '9') pinPress(e.key);
+  if (e.key === 'Backspace') pinDel();
+});
+
+// ── Boot ── PIN lock handles loadFromDB() after correct PIN entry
+</script>
+</body>
+</html>
