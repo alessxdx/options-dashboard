@@ -132,8 +132,8 @@ tr:hover td { background: rgba(255,255,255,0.03); }
   #stock-modal-stats, #daily-modal-stats { grid-template-columns: repeat(2, 1fr) !important; }
 
   /* Forms */
-  .form-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-  .form-group input, .form-group select { font-size: 16px; height: 40px; } /* 16px prevents iOS zoom */
+  .form-grid { grid-template-columns: 1fr; gap: 8px; }
+  .form-group input, .form-group select { font-size: 16px; height: 44px; }
   .btn { padding: 10px 16px; font-size: 13px; }
   .btn-primary { width: 100%; margin-top: 4px; }
 
@@ -361,7 +361,7 @@ tr.row-loss:hover td { background: rgba(255,85,85,0.09); }
   <p class="section-title">Add new trade</p>
   <div class="add-form">
     <div class="form-grid">
-      <div class="form-group"><label>Stock</label><input id="f-stock" placeholder="e.g. AAPL" /></div>
+      <div class="form-group"><label>Stock</label><input id="f-stock" placeholder="e.g. AAPL" autocapitalize="characters" oninput="this.value=this.value.toUpperCase()" /></div>
       <div class="form-group"><label>Trade setup</label>
         <select id="f-setup"><option>Short Put</option><option>Short Call</option><option>Long Put</option><option>Long Call</option></select>
       </div>
@@ -465,7 +465,7 @@ tr.row-loss:hover td { background: rgba(255,85,85,0.09); }
       <button class="modal-close" onclick="closeModal()">&#x2715;</button>
     </div>
     <div class="form-grid">
-      <div class="form-group"><label>Stock</label><input id="e-stock" /></div>
+      <div class="form-group"><label>Stock</label><input id="e-stock" autocapitalize="characters" oninput="this.value=this.value.toUpperCase()" /></div>
       <div class="form-group"><label>Trade setup</label>
         <select id="e-setup"><option>Short Put</option><option>Short Call</option><option>Long Put</option><option>Long Call</option></select>
       </div>
