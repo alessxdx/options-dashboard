@@ -489,9 +489,13 @@ tr.row-loss:hover td { background: rgba(255,85,85,0.09); }
       <button class="modal-close" onclick="closeQuickClose()">&#x2715;</button>
     </div>
     <div id="qc-info" style="font-size:13px;color:var(--text2);margin-bottom:1rem;"></div>
-    <div class="form-grid" style="grid-template-columns:1fr 1fr;">
-      <div class="form-group"><label>Close date</label><input id="qc-date" type="date"></div>
-      <div class="form-group"><label>Close price / contract ($)</label><input id="qc-price" type="number" step="0.01" placeholder="e.g. 0.05"></div>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>Close date</label>
+      <input id="qc-date" type="date">
+    </div>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>Close price / contract ($)</label>
+      <input id="qc-price" type="number" step="0.01" placeholder="e.g. 0.05">
     </div>
     <div class="form-group" style="margin-top:10px;">
       <label>Status</label>
