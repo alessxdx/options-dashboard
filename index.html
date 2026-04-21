@@ -61,7 +61,7 @@ h1 { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -0.3
 .chart-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
 .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
 .table-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 900px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th { text-align: left; font-weight: 600; font-size: 12px; color: var(--text2); padding: 9px 10px; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
 td { padding: 10px 10px; border-bottom: 1px solid var(--border); color: var(--text3); font-size: 14px; white-space: nowrap; }
 tr:last-child td { border-bottom: none; }
@@ -1046,7 +1046,7 @@ function renderTradeTable() {
     btn.textContent = btnLabels[k] + ' (' + counts[k] + ')';
     if (k === activeStatusFilter) btn.classList.add('active'); else btn.classList.remove('active');
   });
-  const tradeCols=[{key:'id',label:'Trade ID'},{key:'stock',label:'Stock'},{key:'setup',label:'Setup'},{key:'open',label:'Open'},{key:'close',label:'Close'},{key:'contracts',label:'Contracts'},{key:'openPrice',label:'Open $'},{key:'closePrice',label:'Close $'},{key:'netPL',label:'Net P&L'},{key:'status',label:'Status'},{key:'days',label:'Days'},{key:'',label:'',nosort:true}];
+  const tradeCols=[{key:'id',label:'Trade ID'},{key:'stock',label:'Stock'},{key:'setup',label:'Setup'},{key:'open',label:'Open'},{key:'close',label:'Close'},{key:'openPrice',label:'Open $'},{key:'closePrice',label:'Close $'},{key:'netPL',label:'Net P&L'},{key:'status',label:'Status'},{key:'',label:'',nosort:true}];
   document.getElementById('trade-thead').innerHTML='<tr>'+tradeCols.map(c=>c.nosort||!c.key?`<th></th>`:`<th class="sortable${tradeSort.col===c.key?' sort-'+tradeSort.dir:''}" onclick="sortTrade('${c.key}')">${c.label}</th>`).join('')+'</tr>';
   const q=(document.getElementById('trade-search').value||'').toLowerCase();
   let filtered=trades.filter(t=>{
@@ -1068,17 +1068,15 @@ function renderTradeTable() {
     const noteDot = hasNote ? `<span class="note-dot" title="${t.notes.replace(/"/g,"'")}"></span>` : '';
     const isOpen = t.status === 'Open';
     return`<tr class="${rowCls}">
-      <td style="font-size:13px;color:var(--text2);" title="${t.id}">${t.id}</td>
-      <td><strong>${t.stock}</strong>${noteDot}</td>
+      <td style="font-size:12px;color:var(--text2);" title="${t.id}">${t.id}</td>
+      <td><strong>${t.stock}</strong>${noteDot}<div style="font-size:11px;color:var(--text2);margin-top:2px;">${t.contracts} contract${t.contracts>1?'s':''} · ${t.days}d</div></td>
       <td style="white-space:nowrap;">${t.setup}</td>
       <td>${fmtDate(t.open)}</td>
       <td>${t.close?fmtDate(t.close):'&#8212;'}</td>
-      <td>${t.contracts}</td>
       <td>$${t.openPrice}</td>
       <td>${hasVal(t.closePrice)?'$'+t.closePrice:'&#8212;'}</td>
       <td class="${hasVal(t.netPL)&&t.netPL>=0?'pos':'neg'}">${hasVal(t.netPL)?fmt(t.netPL):'&#8212;'}</td>
       <td><span class="badge badge-${t.status.toLowerCase()}">${t.status}</span></td>
-      <td>${t.days}</td>
       <td><div class="action-btns">
         ${isOpen?`<button class="quick-btn close-btn" onclick="openQuickClose(${idx})">✓ Close</button>`:''}
         <button class="quick-btn dup-btn" onclick="duplicateTrade(${idx})">⧉ Dup</button>
