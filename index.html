@@ -351,7 +351,7 @@ tr.row-loss:hover td { background: rgba(255,85,85,0.09); }
     <button class="status-filter-btn assigned" onclick="setStatusFilter('Assigned')">Assigned</button>
   </div>
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
-    <input class="search-bar" placeholder="Search by trade ID, stock, setup..." id="trade-search" oninput="renderTradeTable()" style="margin-bottom:0;flex:1;min-width:200px;">
+    <input class="search-bar" placeholder="Search by stock, setup, status, date (e.g. 23-APR-2026)..." id="trade-search" oninput="renderTradeTable()" style="margin-bottom:0;flex:1;min-width:200px;">
     <button class="export-btn" onclick="exportCSV()">⬇ Export CSV</button>
   </div>
   <div class="table-card" style="padding:0;">
@@ -405,7 +405,7 @@ tr.row-loss:hover td { background: rgba(255,85,85,0.09); }
         </div>
         <div class="form-group">
           <label>Close date</label>
-          <input id="f-close" type="date" tabindex="8" />
+          <input id="f-close" type="date" tabindex="8" onchange="autoSetStatus()" />
         </div>
       </div>
 
@@ -416,7 +416,7 @@ tr.row-loss:hover td { background: rgba(255,85,85,0.09); }
         </div>
         <div class="form-group">
           <label>Close price / contract ($)</label>
-          <input id="f-cprice" type="number" step="0.01" placeholder="e.g. 0.05" tabindex="10" />
+          <input id="f-cprice" type="number" step="0.01" placeholder="e.g. 0.05" tabindex="10" oninput="autoSetStatus()" />
         </div>
         <div class="form-group">
           <label>Fees ($)</label>
@@ -1052,11 +1052,16 @@ function renderTradeTable() {
   });
   const tradeCols=[{key:'id',label:'Trade ID'},{key:'stock',label:'Stock'},{key:'setup',label:'Setup'},{key:'open',label:'Open'},{key:'close',label:'Close'},{key:'openPrice',label:'Open $'},{key:'closePrice',label:'Close $'},{key:'netPL',label:'Net P&L'},{key:'status',label:'Status'},{key:'',label:'',nosort:true}];
   document.getElementById('trade-thead').innerHTML='<tr>'+tradeCols.map(c=>c.nosort||!c.key?`<th></th>`:`<th class="sortable${tradeSort.col===c.key?' sort-'+tradeSort.dir:''}" onclick="sortTrade('${c.key}')">${c.label}</th>`).join('')+'</tr>';
-  const q=(document.getElementById('trade-search').value||'').toLowerCase();
+  const q=(document.getElementById('trade-search').value||'').toLowerCase().trim();
   let filtered=trades.filter(t=>{
-    const matchSearch = !q||[t.id,t.stock,t.setup,t.status,t.notes||''].join(' ').toLowerCase().includes(q);
+    if(!q) return true;
+    // Format dates for searching — match both raw (2026-04-23) and display (23-APR-2026)
+    const openDisplay = fmtDate(t.open).toLowerCase();
+    const closeDisplay = t.close ? fmtDate(t.close).toLowerCase() : '';
+    const searchable = [t.id, t.stock, t.setup, t.status, t.notes||'', t.open||'', t.close||'', openDisplay, closeDisplay].join(' ').toLowerCase();
+    // Also allow partial matches like "apr 2026" or "14-apr"
     const matchStatus = activeStatusFilter==='all' || t.status===activeStatusFilter;
-    return matchSearch && matchStatus;
+    return searchable.includes(q) && matchStatus;
   });
   filtered.sort((a,b)=>{
     let av=a[tradeSort.col]??'',bv=b[tradeSort.col]??'';
@@ -1126,6 +1131,15 @@ function openEdit(idx) {
   document.getElementById('e-status').value=t.status;
   document.getElementById('e-notes').value=t.notes||'';
   document.getElementById('edit-msg').textContent='';
+  // Auto-update status when close fields change
+  const autoStatus = () => {
+    const c = document.getElementById('e-close').value;
+    const cp = document.getElementById('e-cprice').value;
+    const st = document.getElementById('e-status');
+    if (c && cp && st.value === 'Open') st.value = 'Closed';
+  };
+  document.getElementById('e-close').onchange = autoStatus;
+  document.getElementById('e-cprice').oninput = autoStatus;
   document.getElementById('edit-modal').classList.add('open');
 }
 function closeModal() { document.getElementById('edit-modal').classList.remove('open'); editIdx=-1; }
@@ -1144,8 +1158,10 @@ async function saveEdit() {
   const cpVal=document.getElementById('e-cprice').value;
   const closePrice=cpVal!==''?parseFloat(cpVal):null;
   const fees=parseFloat(document.getElementById('e-fees').value)||0;
-  const status=document.getElementById('e-status').value;
+  let status=document.getElementById('e-status').value;
   const notes=document.getElementById('e-notes').value;
+  // Auto-close if close date and close price are both filled
+  if(close && closePrice!==null && status==='Open') status='Closed';
   if(!stock||!exp||!strike||!open||!openPrice){document.getElementById('edit-msg').style.color='#ff5555';document.getElementById('edit-msg').textContent='Please fill required fields.';return;}
   const gross=closePrice!=null?(closePrice-openPrice)*contracts*100:openPrice*contracts*100;
   const netPL=closePrice!=null?parseFloat((gross-fees).toFixed(2)):null;
@@ -1167,6 +1183,13 @@ async function deleteTrade() {
   closeModal(); render();
 }
 
+function autoSetStatus() {
+  const close = document.getElementById('f-close').value;
+  const cprice = document.getElementById('f-cprice').value;
+  const status = document.getElementById('f-status');
+  if (close && cprice && status.value === 'Open') status.value = 'Closed';
+}
+
 async function addTrade() {
   const stock=document.getElementById('f-stock').value.trim().toUpperCase();
   const setup=document.getElementById('f-setup').value;
@@ -1178,8 +1201,10 @@ async function addTrade() {
   const openPrice=parseFloat(document.getElementById('f-oprice').value);
   const closePrice=document.getElementById('f-cprice').value?parseFloat(document.getElementById('f-cprice').value):null;
   const fees=parseFloat(document.getElementById('f-fees').value)||0;
-  const status=document.getElementById('f-status').value;
+  let status=document.getElementById('f-status').value;
   const notes=document.getElementById('f-notes').value;
+  // Auto-close if close date and close price are both filled
+  if(close && closePrice!==null && status==='Open') status='Closed';
   const msg=document.getElementById('form-msg');
   if(!stock||!exp||!strike||!open||!openPrice){msg.style.color='#ff5555';msg.textContent='Please fill required fields.';return;}
   const gross=closePrice!=null?(closePrice-openPrice)*contracts*100:openPrice*contracts*100;
