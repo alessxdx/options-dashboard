@@ -1054,13 +1054,12 @@ function renderTradeTable() {
   document.getElementById('trade-thead').innerHTML='<tr>'+tradeCols.map(c=>c.nosort||!c.key?`<th></th>`:`<th class="sortable${tradeSort.col===c.key?' sort-'+tradeSort.dir:''}" onclick="sortTrade('${c.key}')">${c.label}</th>`).join('')+'</tr>';
   const q=(document.getElementById('trade-search').value||'').toLowerCase().trim();
   let filtered=trades.filter(t=>{
-    if(!q) return true;
+    const matchStatus = activeStatusFilter==='all' || t.status===activeStatusFilter;
+    if(!q) return matchStatus;
     // Format dates for searching — match both raw (2026-04-23) and display (23-APR-2026)
     const openDisplay = fmtDate(t.open).toLowerCase();
     const closeDisplay = t.close ? fmtDate(t.close).toLowerCase() : '';
     const searchable = [t.id, t.stock, t.setup, t.status, t.notes||'', t.open||'', t.close||'', openDisplay, closeDisplay].join(' ').toLowerCase();
-    // Also allow partial matches like "apr 2026" or "14-apr"
-    const matchStatus = activeStatusFilter==='all' || t.status===activeStatusFilter;
     return searchable.includes(q) && matchStatus;
   });
   filtered.sort((a,b)=>{
