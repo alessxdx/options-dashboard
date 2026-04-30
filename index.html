@@ -6,30 +6,26 @@
 <title>Options Trading Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-#pin-overlay {
+#login-overlay {
   position: fixed; inset: 0; background: #0d1117; z-index: 99999;
-  display: flex; align-items: center; justify-content: center; flex-direction: column;
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
 }
-#pin-box {
+#login-box {
   background: #161b22; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;
-  padding: 2.5rem 2rem; width: 320px; text-align: center;
+  padding: 2.5rem 2rem; width: 100%; max-width: 360px;
 }
-#pin-title { font-family: 'Montserrat', sans-serif; font-size: 20px; font-weight: 700; color: #e6edf3; margin-bottom: 6px; }
-#pin-sub { font-family: 'Montserrat', sans-serif; font-size: 13px; color: #8b949e; margin-bottom: 1.5rem; }
-#pin-dots { display: flex; justify-content: center; gap: 12px; margin-bottom: 1.5rem; }
-.pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #8b949e; background: transparent; transition: all 0.15s; }
-.pin-dot.filled { background: #00d084; border-color: #00d084; }
-#pin-error { font-family: 'Montserrat', sans-serif; font-size: 13px; color: #ff5555; margin-bottom: 1rem; min-height: 18px; }
-#pin-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.pin-key {
-  font-family: 'Montserrat', sans-serif; font-size: 18px; font-weight: 600;
-  color: #e6edf3; background: #1e2530; border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 10px; padding: 14px; cursor: pointer; transition: all 0.1s;
-}
-.pin-key:hover { background: #2d3748; border-color: rgba(255,255,255,0.2); }
-.pin-key:active { transform: scale(0.95); }
-.pin-key.del { color: #ff5555; }
-.pin-key.empty { visibility: hidden; }
+#login-title { font-family: 'Montserrat', sans-serif; font-size: 22px; font-weight: 700; color: #e6edf3; margin-bottom: 6px; text-align: center; }
+#login-sub { font-family: 'Montserrat', sans-serif; font-size: 13px; color: #8b949e; margin-bottom: 1.5rem; text-align: center; }
+.login-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.login-field label { font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 600; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; }
+.login-field input { font-family: 'Montserrat', sans-serif; font-size: 15px; padding: 11px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.14); background: #1e2530; color: #e6edf3; height: 44px; outline: none; }
+.login-field input:focus { border-color: #58a6ff; }
+#login-error { font-family: 'Montserrat', sans-serif; font-size: 13px; color: #ff5555; margin-bottom: 12px; min-height: 18px; text-align: center; }
+#login-btn { width: 100%; padding: 12px; border-radius: 8px; font-family: 'Montserrat', sans-serif; font-size: 15px; font-weight: 700; background: #58a6ff; color: #fff; border: none; cursor: pointer; transition: background 0.15s; }
+#login-btn:hover { background: #79b8ff; }
+#login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+#signout-btn { background: transparent; border: 1px solid rgba(255,255,255,0.14); color: #8b949e; padding: 6px 14px; border-radius: 7px; font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; }
+#signout-btn:hover { border-color: #ff5555; color: #ff5555; }
 </style>
 <style>
 :root {
@@ -228,31 +224,22 @@ tr.row-loss:hover td { background: rgba(255,85,85,0.09); }
 </style>
 </head>
 <body>
-<div id="pin-overlay">
-  <div id="pin-box">
-    <div id="pin-title">Options Trading Dashboard</div>
-    <div id="pin-sub">Enter your PIN to continue</div>
-    <div id="pin-dots">
-      <div class="pin-dot" id="d0"></div>
-      <div class="pin-dot" id="d1"></div>
-      <div class="pin-dot" id="d2"></div>
-      <div class="pin-dot" id="d3"></div>
-    </div>
-    <div id="pin-error"></div>
-    <div id="pin-keypad">
-      <button class="pin-key" onclick="pinPress('1')">1</button>
-      <button class="pin-key" onclick="pinPress('2')">2</button>
-      <button class="pin-key" onclick="pinPress('3')">3</button>
-      <button class="pin-key" onclick="pinPress('4')">4</button>
-      <button class="pin-key" onclick="pinPress('5')">5</button>
-      <button class="pin-key" onclick="pinPress('6')">6</button>
-      <button class="pin-key" onclick="pinPress('7')">7</button>
-      <button class="pin-key" onclick="pinPress('8')">8</button>
-      <button class="pin-key" onclick="pinPress('9')">9</button>
-      <button class="pin-key empty"></button>
-      <button class="pin-key" onclick="pinPress('0')">0</button>
-      <button class="pin-key del" onclick="pinDel()">⌫</button>
-    </div>
+<div id="login-overlay">
+  <div id="login-box">
+    <div id="login-title">Options Trading Dashboard</div>
+    <div id="login-sub">Sign in to continue</div>
+    <form id="login-form" onsubmit="return false;">
+      <div class="login-field">
+        <label>Email</label>
+        <input type="email" id="login-email" autocomplete="username" placeholder="you@example.com" required>
+      </div>
+      <div class="login-field">
+        <label>Password</label>
+        <input type="password" id="login-password" autocomplete="current-password" placeholder="••••••••" required>
+      </div>
+      <div id="login-error"></div>
+      <button type="submit" id="login-btn" onclick="doLogin()">Sign in</button>
+    </form>
   </div>
 </div>
 
@@ -261,6 +248,7 @@ tr.row-loss:hover td { background: rgba(255,85,85,0.09); }
   <div class="header-dot"></div>
   <h1>Options Trading Dashboard</h1>
   <span id="sync-status" style="margin-left:auto;font-size:13px;font-weight:500;"></span>
+  <button id="signout-btn" onclick="doSignOut()" title="Sign out">Sign out</button>
 </div>
 
 <div class="tabs">
@@ -562,7 +550,8 @@ function tradeToRow(t) {
     strike: t.strike, open_date: t.open, close_date: t.close||null,
     contracts: t.contracts, open_price: t.openPrice,
     close_price: t.closePrice, gross: t.gross, fees: t.fees,
-    net_pl: t.netPL, status: t.status, days: t.days, notes: t.notes||''
+    net_pl: t.netPL, status: t.status, days: t.days, notes: t.notes||'',
+    user_id: authSession?.user?.id || null
   };
 }
 
@@ -576,20 +565,117 @@ function rowToTrade(r) {
   };
 }
 
+// Auth session — populated after login, persisted in localStorage
+let authSession = null;
+const SESSION_STORAGE_KEY = 'optdash_auth_session';
+
+function loadStoredSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    // Check if expired
+    if (s.expires_at && s.expires_at * 1000 < Date.now()) {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      return null;
+    }
+    return s;
+  } catch (e) { return null; }
+}
+
+function saveSession(session) {
+  authSession = session;
+  if (session) {
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  } else {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+  }
+}
+
 async function sbFetch(path, opts={}) {
+  // Use JWT if logged in, else fall back to anon key (for unauthenticated calls)
+  const token = authSession?.access_token || SUPABASE_KEY;
   const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
     ...opts,
     headers: {
       'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Authorization': 'Bearer ' + token,
       'Content-Type': 'application/json',
       'Prefer': opts.prefer || '',
       ...opts.headers
     }
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const errText = await res.text();
+    // If unauthorized, session may have expired — clear it
+    if (res.status === 401) {
+      saveSession(null);
+      showLogin();
+    }
+    throw new Error(errText);
+  }
   const text = await res.text();
   return text ? JSON.parse(text) : null;
+}
+
+// ── Auth functions ────────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!email || !password) { errEl.textContent = 'Please enter email and password.'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  try {
+    const res = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      errEl.textContent = data.error_description || data.msg || 'Sign-in failed.';
+      btn.disabled = false; btn.textContent = 'Sign in';
+      return;
+    }
+    saveSession(data);
+    hideLogin();
+    loadFromDB();
+  } catch (e) {
+    errEl.textContent = 'Network error. Please try again.';
+    btn.disabled = false; btn.textContent = 'Sign in';
+  }
+}
+
+function doSignOut() {
+  if (!confirm('Sign out?')) return;
+  saveSession(null);
+  // Clear in-memory data and reload to login screen
+  trades = [];
+  showLogin();
+}
+
+function showLogin() {
+  const overlay = document.getElementById('login-overlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    overlay.style.opacity = '1';
+    document.getElementById('login-email').value = '';
+    document.getElementById('login-password').value = '';
+    document.getElementById('login-error').textContent = '';
+    document.getElementById('login-btn').disabled = false;
+    document.getElementById('login-btn').textContent = 'Sign in';
+  }
+}
+
+function hideLogin() {
+  const overlay = document.getElementById('login-overlay');
+  if (overlay) {
+    overlay.style.transition = 'opacity 0.3s';
+    overlay.style.opacity = '0';
+    setTimeout(() => overlay.style.display = 'none', 300);
+  }
 }
 
 async function loadFromDB() {
@@ -1113,6 +1199,15 @@ function renderTradeTable() {
   });
 }
 
+// ── P&L direction helper ──────────────────────────────────────────────────────
+// Short trades: sell to open, buy to close → profit when close < open
+// Long trades: buy to open, sell to close → profit when close > open
+function calcGross(setup, openPrice, closePrice, contracts) {
+  const isShort = setup.toLowerCase().includes('short');
+  const diff = isShort ? (openPrice - closePrice) : (closePrice - openPrice);
+  return diff * contracts * 100;
+}
+
 // ── Edit / Add / Delete ───────────────────────────────────────────────────────
 let editIdx = -1;
 function openEdit(idx) {
@@ -1162,7 +1257,7 @@ async function saveEdit() {
   // Auto-close if close date and close price are both filled
   if(close && closePrice!==null && status==='Open') status='Closed';
   if(!stock||!exp||!strike||!open||!openPrice){document.getElementById('edit-msg').style.color='#ff5555';document.getElementById('edit-msg').textContent='Please fill required fields.';return;}
-  const gross=closePrice!=null?(closePrice-openPrice)*contracts*100:openPrice*contracts*100;
+  const gross=closePrice!=null?calcGross(setup,openPrice,closePrice,contracts):0;
   const netPL=closePrice!=null?parseFloat((gross-fees).toFixed(2)):null;
   const days=close?Math.round((new Date(close)-new Date(open))/(1000*60*60*24)):0;
   const updated={id:t.id,stock,setup,exp,strike,open,close:close||'',contracts,openPrice,closePrice,gross,fees,netPL,status,days,notes};
@@ -1206,8 +1301,8 @@ async function addTrade() {
   if(close && closePrice!==null && status==='Open') status='Closed';
   const msg=document.getElementById('form-msg');
   if(!stock||!exp||!strike||!open||!openPrice){msg.style.color='#ff5555';msg.textContent='Please fill required fields.';return;}
-  const gross=closePrice!=null?(closePrice-openPrice)*contracts*100:openPrice*contracts*100;
-  const netPL=closePrice!=null?gross-fees:null;
+  const gross=closePrice!=null?calcGross(setup,openPrice,closePrice,contracts):0;
+  const netPL=closePrice!=null?parseFloat((gross-fees).toFixed(2)):null;
   const days=close?Math.round((new Date(close)-new Date(open))/(1000*60*60*24)):0;
   const newTrade={id:`${stock}|${setup}|${exp}|${strike}`,stock,setup,exp,strike,open,close:close||'',contracts,openPrice,closePrice,gross,fees,netPL,status,days,notes};
   trades.push(newTrade);
@@ -1262,7 +1357,7 @@ async function saveQuickClose() {
   const status = document.getElementById('qc-status').value;
   const msg = document.getElementById('qc-msg');
   if (!closeDate || isNaN(closePrice)) { msg.style.color='#ff5555'; msg.textContent='Please fill in close date and price.'; return; }
-  const gross = (closePrice - t.openPrice) * t.contracts * 100;
+  const gross = calcGross(t.setup, t.openPrice, closePrice, t.contracts);
   const netPL = parseFloat((gross - t.fees).toFixed(2));
   const days = Math.round((new Date(closeDate) - new Date(t.open)) / (1000*60*60*24));
   const updated = {...t, close:closeDate, closePrice, gross, netPL, status, days};
@@ -1313,60 +1408,30 @@ function switchTab(name) {
   setTimeout(()=>{render();},50);
 }
 
-// ── PIN lock ──────────────────────────────────────────────────────────────────
-const CORRECT_PIN = '1209';
-let pinEntry = '';
-
-function pinPress(digit) {
-  if (pinEntry.length >= 4) return;
-  pinEntry += digit;
-  updatePinDots();
-  if (pinEntry.length === 4) {
-    setTimeout(checkPin, 150);
-  }
-}
-
-function pinDel() {
-  pinEntry = pinEntry.slice(0, -1);
-  updatePinDots();
-  document.getElementById('pin-error').textContent = '';
-}
-
-function updatePinDots() {
-  for (let i = 0; i < 4; i++) {
-    document.getElementById('d'+i).classList.toggle('filled', i < pinEntry.length);
-  }
-}
-
-function checkPin() {
-  if (pinEntry === CORRECT_PIN) {
-    const overlay = document.getElementById('pin-overlay');
-    overlay.style.transition = 'opacity 0.3s';
-    overlay.style.opacity = '0';
-    setTimeout(() => overlay.remove(), 300);
-    loadFromDB();
-  } else {
-    document.getElementById('pin-error').textContent = 'Incorrect PIN. Try again.';
-    pinEntry = '';
-    updatePinDots();
-    // Shake animation
-    const box = document.getElementById('pin-box');
-    box.style.animation = 'none';
-    box.style.transform = 'translateX(-8px)';
-    setTimeout(() => box.style.transform = 'translateX(8px)', 80);
-    setTimeout(() => box.style.transform = 'translateX(-4px)', 160);
-    setTimeout(() => box.style.transform = 'translateX(0)', 240);
-  }
-}
-
-// Allow keyboard input too
+// ── Auth boot ─────────────────────────────────────────────────────────────────
+// Allow Enter key to submit the login form
 document.addEventListener('keydown', e => {
-  if (!document.getElementById('pin-overlay')) return;
-  if (e.key >= '0' && e.key <= '9') pinPress(e.key);
-  if (e.key === 'Backspace') pinDel();
+  const overlay = document.getElementById('login-overlay');
+  if (!overlay || overlay.style.display === 'none') return;
+  if (e.key === 'Enter') { e.preventDefault(); doLogin(); }
 });
 
-// ── Boot ── PIN lock handles loadFromDB() after correct PIN entry
+// On page load: check for stored session
+(function bootAuth() {
+  const stored = loadStoredSession();
+  if (stored && stored.access_token) {
+    authSession = stored;
+    hideLogin();
+    loadFromDB();
+  } else {
+    showLogin();
+    // Focus email field
+    setTimeout(() => {
+      const el = document.getElementById('login-email');
+      if (el) el.focus();
+    }, 100);
+  }
+})();
 </script>
 </body>
 </html>
