@@ -385,6 +385,7 @@ tr.row-loss:hover td { background: rgba(255,85,85,0.09); }
   </div>
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
     <input class="search-bar" placeholder="Search by stock, setup, status, date (e.g. 23-APR-2026)..." id="trade-search" oninput="renderTradeTable()" style="margin-bottom:0;flex:1;min-width:200px;">
+    <button class="export-btn" onclick="recalcAllPL()" title="Recalculate gross & net P&L for all closed trades from current prices/setup">↻ Recalc P&L</button>
     <button class="export-btn" onclick="exportCSV()">⬇ Export CSV</button>
   </div>
   <div class="table-card" style="padding:0;">
@@ -751,7 +752,11 @@ async function loadFromDB() {
     trades = [...SEED_TRADES];
     showStatus('⚠ Offline mode — changes won\'t sync', 'warn');
   }
-  render();
+  // Restore the tab the user was on before reload
+  let savedTab = 'overview';
+  try { savedTab = localStorage.getItem('optdash_active_tab') || 'overview'; } catch(e) {}
+  if(!['overview','daily','stocks','trades','add'].includes(savedTab)) savedTab='overview';
+  switchTab(savedTab);
 }
 
 async function seedDB() {
@@ -1266,6 +1271,36 @@ function calcGross(setup, openPrice, closePrice, contracts) {
   return diff * contracts * 100;
 }
 
+async function recalcAllPL() {
+  const closed = trades.filter(t => hasVal(t.closePrice) && hasVal(t.openPrice));
+  if(!closed.length){ showStatus('No closed trades to recalc','info'); return; }
+  let fixed = 0;
+  const fixes = [];
+  closed.forEach(t => {
+    const correctGross = parseFloat(calcGross(t.setup, t.openPrice, t.closePrice, t.contracts).toFixed(2));
+    const correctNet = parseFloat((correctGross - (t.fees||0)).toFixed(2));
+    if(Math.abs((t.gross||0) - correctGross) > 0.01 || Math.abs((t.netPL||0) - correctNet) > 0.01){
+      fixes.push({id:t.id, oldNet:t.netPL, newNet:correctNet});
+      t.gross = correctGross;
+      t.netPL = correctNet;
+      fixed++;
+    }
+  });
+  if(!fixed){ showStatus('✓ All P&L correct — nothing to fix','success'); return; }
+  if(!confirm(`Found ${fixed} trade(s) with incorrect P&L. Examples:\n` + fixes.slice(0,5).map(f=>`  ${f.id}: ${fmt(f.oldNet)} → ${fmt(f.newNet)}`).join('\n') + `\n\nApply fixes and save to cloud?`)){
+    // User cancelled — re-load from server to discard local changes
+    if(dbAvailable) await loadFromDB();
+    render();
+    return;
+  }
+  showStatus(`Saving ${fixed} fixes...`,'info');
+  for(const t of closed){
+    try{ await saveTrade(t); }catch(e){ console.error('recalc save fail',t.id,e); }
+  }
+  showStatus(`✓ Fixed ${fixed} trade(s)`,'success');
+  render();
+}
+
 // ── Edit / Add / Delete ───────────────────────────────────────────────────────
 let editIdx = -1;
 function openEdit(idx) {
@@ -1314,15 +1349,21 @@ async function saveEdit() {
   const notes=document.getElementById('e-notes').value;
   // Auto-close if close date and close price are both filled
   if(close && closePrice!==null && status==='Open') status='Closed';
-  if(!stock||!exp||!strike||!open||!openPrice){document.getElementById('edit-msg').style.color='#ff5555';document.getElementById('edit-msg').textContent='Please fill required fields.';return;}
+  if(!stock||!exp||isNaN(strike)||!open||isNaN(openPrice)){document.getElementById('edit-msg').style.color='#ff5555';document.getElementById('edit-msg').textContent='Please fill required fields.';return;}
   const gross=closePrice!=null?calcGross(setup,openPrice,closePrice,contracts):0;
   const netPL=closePrice!=null?parseFloat((gross-fees).toFixed(2)):null;
   const days=close?Math.round((new Date(close)-new Date(open))/(1000*60*60*24)):0;
   const updated={id:t.id,stock,setup,exp,strike,open,close:close||'',contracts,openPrice,closePrice,gross,fees,netPL,status,days,notes};
   trades[editIdx]=updated;
   showStatus('Saving...','info');
-  await saveTrade(updated);
-  closeModal(); render();
+  try {
+    await saveTrade(updated);
+    showStatus('✓ Saved','success');
+  } catch(e) {
+    showStatus('⚠ Save failed locally synced','warn');
+  }
+  closeModal();
+  render();
 }
 
 async function deleteTrade() {
@@ -1465,6 +1506,8 @@ function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   if(titles[name]){document.getElementById('page-title').textContent=titles[name][0];document.getElementById('page-sub').textContent=titles[name][1];}
+  // Persist for next page load
+  try { localStorage.setItem('optdash_active_tab', name); } catch(e) {}
   // Close sidebar on mobile after selection
   if(window.innerWidth<=900){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebar-overlay').classList.remove('open');}
   setTimeout(()=>{render();},50);
