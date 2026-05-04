@@ -1352,6 +1352,21 @@ function openEdit(idx) {
 }
 function closeModal() { document.getElementById('edit-modal').classList.remove('open'); editIdx=-1; }
 
+// Build a Trade ID from core fields, preserving any suffix from oldId (e.g. |R2, |T1A)
+// Strike type: Put or Call (strips Long/Short)
+function buildTradeId(stock, setup, exp, strike, oldId) {
+  const sideBase = setup.toLowerCase().includes('call') ? 'Call' : 'Put';
+  const baseId = `${stock}|${sideBase}|${exp}|${strike}`;
+  if (!oldId) return baseId;
+  // Detect suffix on old ID — anything after the 4th pipe (|R2, |T1A, etc)
+  const parts = oldId.split('|');
+  if (parts.length > 4) {
+    const suffix = parts.slice(4).join('|');
+    return baseId + '|' + suffix;
+  }
+  return baseId;
+}
+
 async function saveEdit() {
   if(editIdx<0) return;
   const t=trades[editIdx];
@@ -1374,13 +1389,33 @@ async function saveEdit() {
   const gross=closePrice!=null?calcGross(setup,openPrice,closePrice,contracts):0;
   const netPL=closePrice!=null?parseFloat((gross-fees).toFixed(2)):null;
   const days=close?Math.round((new Date(close)-new Date(open))/(1000*60*60*24)):0;
-  const updated={id:t.id,stock,setup,exp,strike,open,close:close||'',contracts,openPrice,closePrice,gross,fees,netPL,status,days,notes};
+
+  // Regenerate Trade ID from current values
+  const oldId = t.id;
+  let newId = buildTradeId(stock, setup, exp, strike, oldId);
+  // If the new ID would collide with another existing trade, auto-append a suffix
+  if (newId !== oldId && trades.some(x => x.id === newId)) {
+    let n = 2;
+    while (trades.some(x => x.id === newId + '|R' + n)) n++;
+    newId = newId + '|R' + n;
+    console.log('[saveEdit] new ID would collide, using:', newId);
+  }
+  const idChanged = newId !== oldId;
+
+  const updated={id:newId,stock,setup,exp,strike,open,close:close||'',contracts,openPrice,closePrice,gross,fees,netPL,status,days,notes};
   trades[editIdx]=updated;
-  console.log('[saveEdit] local trades[] updated:', updated);
+  console.log('[saveEdit] local trades[] updated:', updated, 'idChanged:', idChanged, 'oldId:', oldId);
   showStatus('Saving...','info');
   try {
+    if (idChanged && dbAvailable) {
+      // Delete old row, then insert new one (atomic-ish — we accept the small window)
+      await sbFetch('trades?id=eq.' + encodeURIComponent(oldId), {
+        method: 'DELETE', prefer: 'return=minimal'
+      });
+      console.log('[saveEdit] deleted old row:', oldId);
+    }
     await saveTrade(updated);
-    showStatus('✓ Saved to cloud','success');
+    showStatus('✓ Saved' + (idChanged ? ' (ID renamed)' : ''),'success');
   } catch(e) {
     console.error('[saveEdit] cloud save failed:', e);
     showStatus('⚠ Cloud save FAILED: ' + (e.message||'unknown').slice(0,80),'error');
