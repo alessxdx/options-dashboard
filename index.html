@@ -774,16 +774,26 @@ async function seedDB() {
 }
 
 async function saveTrade(t) {
-  if (!dbAvailable) return;
-  try {
-    await sbFetch('trades?id=eq.' + encodeURIComponent(t.id), {
-      method: 'DELETE', prefer: 'return=minimal'
-    });
-    await sbFetch('trades', {
-      method: 'POST', prefer: 'return=minimal',
-      body: JSON.stringify(tradeToRow(t))
-    });
-  } catch(e) { console.error('Save failed:', e); showStatus('⚠ Save failed: ' + e.message, 'error'); }
+  if (!dbAvailable) { console.warn('[saveTrade] dbAvailable=false, skipping cloud save for', t.id); return; }
+  const row = tradeToRow(t);
+  console.log('[saveTrade] sending row:', row);
+  // Use UPSERT on the id column — atomic, no DELETE+POST race
+  const res = await sbFetch('trades?on_conflict=id', {
+    method: 'POST',
+    prefer: 'return=representation,resolution=merge-duplicates',
+    body: JSON.stringify(row)
+  });
+  console.log('[saveTrade] server returned:', res);
+  // Verify what came back actually matches what we sent
+  if (Array.isArray(res) && res[0]) {
+    const returned = res[0];
+    if (Math.abs((returned.strike||0) - (row.strike||0)) > 0.001 ||
+        Math.abs((returned.net_pl||0) - (row.net_pl||0)) > 0.001) {
+      console.error('[saveTrade] MISMATCH — sent vs returned:', row, returned);
+      throw new Error('Server returned different values than sent. Check console.');
+    }
+  }
+  return res;
 }
 
 async function deleteTrade_db(id) {
@@ -1274,31 +1284,42 @@ function calcGross(setup, openPrice, closePrice, contracts) {
 async function recalcAllPL() {
   const closed = trades.filter(t => hasVal(t.closePrice) && hasVal(t.openPrice));
   if(!closed.length){ showStatus('No closed trades to recalc','info'); return; }
-  let fixed = 0;
+  let needsFix = 0;
   const fixes = [];
   closed.forEach(t => {
     const correctGross = parseFloat(calcGross(t.setup, t.openPrice, t.closePrice, t.contracts).toFixed(2));
     const correctNet = parseFloat((correctGross - (t.fees||0)).toFixed(2));
     if(Math.abs((t.gross||0) - correctGross) > 0.01 || Math.abs((t.netPL||0) - correctNet) > 0.01){
-      fixes.push({id:t.id, oldNet:t.netPL, newNet:correctNet});
-      t.gross = correctGross;
-      t.netPL = correctNet;
-      fixed++;
+      fixes.push({trade:t, oldNet:t.netPL, newNet:correctNet, newGross:correctGross});
+      needsFix++;
     }
   });
-  if(!fixed){ showStatus('✓ All P&L correct — nothing to fix','success'); return; }
-  if(!confirm(`Found ${fixed} trade(s) with incorrect P&L. Examples:\n` + fixes.slice(0,5).map(f=>`  ${f.id}: ${fmt(f.oldNet)} → ${fmt(f.newNet)}`).join('\n') + `\n\nApply fixes and save to cloud?`)){
-    // User cancelled — re-load from server to discard local changes
-    if(dbAvailable) await loadFromDB();
-    render();
+  if(!needsFix){ showStatus('✓ All P&L correct — nothing to fix','success'); return; }
+  if(!confirm(`Found ${needsFix} trade(s) with incorrect P&L. Examples:\n` + fixes.slice(0,5).map(f=>`  ${f.trade.id}: ${fmt(f.oldNet)} → ${fmt(f.newNet)}`).join('\n') + `\n\nApply fixes and save to cloud?`)){
     return;
   }
-  showStatus(`Saving ${fixed} fixes...`,'info');
-  for(const t of closed){
-    try{ await saveTrade(t); }catch(e){ console.error('recalc save fail',t.id,e); }
+  showStatus(`Saving ${needsFix} fixes...`,'info');
+  let okCount = 0, failCount = 0;
+  const failures = [];
+  for(const f of fixes){
+    f.trade.gross = f.newGross;
+    f.trade.netPL = f.newNet;
+    try {
+      await saveTrade(f.trade);
+      okCount++;
+    } catch(e) {
+      failCount++;
+      failures.push({id:f.trade.id, err:(e.message||'unknown').slice(0,100)});
+      console.error('[recalc] save failed for', f.trade.id, e);
+    }
   }
-  showStatus(`✓ Fixed ${fixed} trade(s)`,'success');
   render();
+  if(failCount === 0){
+    showStatus(`✓ Fixed ${okCount} trade(s) and saved to cloud`,'success');
+  } else {
+    showStatus(`⚠ ${okCount} saved, ${failCount} FAILED — see console`,'error');
+    alert(`Recalc partially failed:\n\n${okCount} saved successfully\n${failCount} failed to save\n\nFirst few failures:\n` + failures.slice(0,5).map(f=>`  ${f.id}: ${f.err}`).join('\n') + '\n\nOpen browser console (F12) for details. Local view shows correct values but cloud has old values for failed rows.');
+  }
 }
 
 // ── Edit / Add / Delete ───────────────────────────────────────────────────────
@@ -1355,12 +1376,15 @@ async function saveEdit() {
   const days=close?Math.round((new Date(close)-new Date(open))/(1000*60*60*24)):0;
   const updated={id:t.id,stock,setup,exp,strike,open,close:close||'',contracts,openPrice,closePrice,gross,fees,netPL,status,days,notes};
   trades[editIdx]=updated;
+  console.log('[saveEdit] local trades[] updated:', updated);
   showStatus('Saving...','info');
   try {
     await saveTrade(updated);
-    showStatus('✓ Saved','success');
+    showStatus('✓ Saved to cloud','success');
   } catch(e) {
-    showStatus('⚠ Save failed locally synced','warn');
+    console.error('[saveEdit] cloud save failed:', e);
+    showStatus('⚠ Cloud save FAILED: ' + (e.message||'unknown').slice(0,80),'error');
+    alert('Cloud save failed:\n\n' + (e.message||'unknown error') + '\n\nLocal change applied. Open browser console (F12) for details.');
   }
   closeModal();
   render();
