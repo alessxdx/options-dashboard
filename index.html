@@ -1353,10 +1353,9 @@ function openEdit(idx) {
 function closeModal() { document.getElementById('edit-modal').classList.remove('open'); editIdx=-1; }
 
 // Build a Trade ID from core fields, preserving any suffix from oldId (e.g. |R2, |T1A)
-// Strike type: Put or Call (strips Long/Short)
+// Uses the FULL setup name (e.g. "Short Put", "Long Call") so direction is visible in ID
 function buildTradeId(stock, setup, exp, strike, oldId) {
-  const sideBase = setup.toLowerCase().includes('call') ? 'Call' : 'Put';
-  const baseId = `${stock}|${sideBase}|${exp}|${strike}`;
+  const baseId = `${stock}|${setup}|${exp}|${strike}`;
   if (!oldId) return baseId;
   // Detect suffix on old ID — anything after the 4th pipe (|R2, |T1A, etc)
   const parts = oldId.split('|');
