@@ -95,7 +95,7 @@ body[data-page="add"]      .page-title { color: var(--add); }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
 .main { margin-left: var(--sidebar-w); padding: 32px; flex: 1; max-width: 100%; min-width: 0; overflow-x: hidden; }
-.dash { max-width: 1800px; margin: 0 auto; min-width: 0; }
+.dash { max-width: 2400px; margin: 0 auto; min-width: 0; }
 .page-header { margin-bottom: 28px; }
 .page-title { font-size: clamp(20px, 0.39vw + 18.5px, 32px); font-weight: 700; letter-spacing: -0.025em; margin-bottom: 6px; line-height: 1.1; }
 .page-sub { color: var(--muted); font-size: 13px; margin-top: 6px; font-weight: 500; }
@@ -145,6 +145,7 @@ tr:hover td { background: var(--surface2); }
 .trade-form-grid { display: flex; flex-direction: column; gap: 14px; margin-bottom: 14px; }
 .form-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .form-row:last-child { border-bottom: none; padding-bottom: 0; }
+@media (max-width: 1100px) { .form-row { grid-template-columns: repeat(2, 1fr); } }
 .form-group label { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.04em; }
 .form-group input, .form-group select { font-size: 14px; font-family: 'Montserrat', sans-serif; padding: 7px 10px; border-radius: 7px; border: 1px solid var(--border2); background: var(--bg3); color: var(--text); height: 36px; outline: none; }
 .form-group input:focus, .form-group select:focus { border-color: var(--accent); }
@@ -160,20 +161,18 @@ tr:hover td { background: var(--surface2); }
 .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 
 /* ── Responsive grid cascade ─────────────────────────────────────────────── */
-/* >1700px ultrawide: 5 cols (default above) */
-@media (max-width: 1700px) { .metric-grid { grid-template-columns: repeat(4, 1fr); } }
-@media (max-width: 1450px) { .metric-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 1250px) { .metric-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 1024px) { .metric-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 768px)  { .metric-grid { grid-template-columns: repeat(2, 1fr); } }
+/* Sidebar is 240px on desktop, hidden below 900px.
+   Effective content width = viewport − 240 sidebar − 64 padding (desktop)
+                          = viewport − 32 padding (mobile, <900px). */
+/* >1900px: 5 cols (default above) — 27"+ monitors */
+@media (max-width: 1900px) { .metric-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 1500px) { .metric-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 1150px) { .metric-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 480px)  { .metric-grid { grid-template-columns: 1fr; } }
 
-/* ── Table tightening on small laptops (≤1250px) ─────────────────────────── */
-@media (max-width: 1250px) {
-  table { font-size: 13px; }
+/* ── Table tightening on small viewports ─────────────────────────────────── */
+@media (max-width: 1100px) {
   th, td { padding: 9px 8px; }
-  .ticker-badge { font-size: 10px; padding: 2px 7px; }
-  .badge { font-size: 10px; padding: 2px 8px; }
   /* Hide Trade ID column on trade history table — the stock badge + setup already identify it */
   #trade-thead th:first-child, #trade-tbody td:first-child { display: none; }
 }
@@ -335,9 +334,7 @@ tr.row-loss:hover td { background: rgba(255,85,85,0.09); }
       <button class="nav-item" data-tab="add" onclick="switchTab('add')"><span class="nav-dot nav-dot-add"></span>+ Add trade</button>
     </nav>
     <div class="sidebar-footer">
-      <div class="sidebar-status"><span class="sidebar-status-dot"></span><span id="sync-status">Synced</span></div>
-      <div class="sidebar-user" id="sidebar-user"></div>
-      <button id="signout-btn" onclick="doSignOut()" style="width:100%;">Sign out</button>
+      <div class="sidebar-status"><span id="sync-status">Synced</span></div>
     </div>
   </aside>
 
@@ -456,7 +453,7 @@ tr.row-loss:hover td { background: rgba(255,85,85,0.09); }
         <div class="form-group">
           <label>Trade setup</label>
           <select id="f-setup" tabindex="2">
-            <option>Short Put</option><option>Short Call</option><option>Long Put</option><option>Long Call</option>
+            <option>Long Call</option><option>Short Put</option><option>Short Call</option><option>Long Put</option>
           </select>
         </div>
         <div class="form-group">
@@ -492,11 +489,11 @@ tr.row-loss:hover td { background: rgba(255,85,85,0.09); }
 
       <div class="form-row">
         <div class="form-group">
-          <label>Open price / contract ($)</label>
+          <label>Open price ($)</label>
           <input id="f-oprice" type="number" step="0.01" placeholder="e.g. 1.25" tabindex="9" />
         </div>
         <div class="form-group">
-          <label>Close price / contract ($)</label>
+          <label>Close price ($)</label>
           <input id="f-cprice" type="number" step="0.01" placeholder="e.g. 0.05" tabindex="10" oninput="autoSetStatus()" />
         </div>
         <div class="form-group">
@@ -577,7 +574,7 @@ tr.row-loss:hover td { background: rgba(255,85,85,0.09); }
       <input id="qc-date" type="date">
     </div>
     <div class="form-group" style="margin-bottom:12px;">
-      <label>Close price / contract ($)</label>
+      <label>Close price ($)</label>
       <input id="qc-price" type="number" step="0.01" placeholder="e.g. 0.05">
     </div>
     <div class="form-group" style="margin-top:10px;">
@@ -612,8 +609,8 @@ tr.row-loss:hover td { background: rgba(255,85,85,0.09); }
       <div class="form-group"><label>Open date</label><input id="e-open" type="date" /></div>
       <div class="form-group"><label>Close date</label><input id="e-close" type="date" /></div>
       <div class="form-group"><label>Contracts</label><input id="e-contracts" type="number" /></div>
-      <div class="form-group"><label>Open price / contract ($)</label><input id="e-oprice" type="number" step="0.01" /></div>
-      <div class="form-group"><label>Close price / contract ($)</label><input id="e-cprice" type="number" step="0.01" /></div>
+      <div class="form-group"><label>Open price ($)</label><input id="e-oprice" type="number" step="0.01" /></div>
+      <div class="form-group"><label>Close price ($)</label><input id="e-cprice" type="number" step="0.01" /></div>
       <div class="form-group"><label>Fees ($)</label><input id="e-fees" type="number" step="0.01" /></div>
       <div class="form-group"><label>Status</label>
         <select id="e-status"><option>Open</option><option>Closed</option><option>Expired</option><option>Assigned</option></select>
@@ -1505,6 +1502,12 @@ async function addTrade() {
   if(close && closePrice!==null && status==='Open') status='Closed';
   const msg=document.getElementById('form-msg');
   if(!stock||!exp||!strike||!open||!openPrice){msg.style.color='#f25f4c';msg.textContent='Please fill required fields.';return;}
+  // Closed status requires close date + close price (so net P&L can be computed)
+  if(status==='Closed' && (!close || closePrice===null || isNaN(closePrice))){
+    msg.style.color='#f25f4c';
+    msg.textContent='Status is Closed — please fill close date and close price.';
+    return;
+  }
   const gross=closePrice!=null?calcGross(setup,openPrice,closePrice,contracts):0;
   const netPL=closePrice!=null?parseFloat((gross-fees).toFixed(2)):null;
   const days=close?Math.round((new Date(close)-new Date(open))/(1000*60*60*24)):0;
@@ -1513,6 +1516,11 @@ async function addTrade() {
   msg.style.color='#4cb782'; msg.textContent='Saving to cloud...';
   await saveTrade(newTrade);
   msg.textContent='✓ Trade saved!';
+  // Reset form for the next entry — open date defaults back to today
+  ['f-stock','f-strike','f-close','f-oprice','f-cprice','f-fees','f-notes'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('f-contracts').value='1';
+  document.getElementById('f-status').value='Open';
+  document.getElementById('f-open').value=new Date().toISOString().slice(0,10);
   render(); setTimeout(()=>{msg.textContent='';},2000);
 }
 
@@ -1612,6 +1620,11 @@ function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   if(titles[name]){document.getElementById('page-title').textContent=titles[name][0];document.getElementById('page-sub').textContent=titles[name][1];}
+  // Default open date to today on the Add Trade form (only if blank — don't clobber a half-filled form)
+  if(name==='add'){
+    const openEl = document.getElementById('f-open');
+    if(openEl && !openEl.value) openEl.value = new Date().toISOString().slice(0,10);
+  }
   // Persist for next page load
   try { localStorage.setItem('optdash_active_tab', name); } catch(e) {}
   // Close sidebar on mobile after selection
