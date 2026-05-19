@@ -657,6 +657,33 @@ function rowToTrade(r) {
   };
 }
 
+// ── Auto-expire sweep ─────────────────────────────────────────────────────────
+// Any Open trade with exp date in the past gets flipped to Expired,
+// closed at $0 on the exp date, and P&L computed from the premium.
+// (For OTM short options the premium is full profit; for long options it's the full loss.)
+async function sweepExpired() {
+  const today = new Date().toISOString().slice(0,10);
+  const toUpdate = [];
+  trades.forEach((t, idx) => {
+    if (t.status !== 'Open') return;
+    if (!t.exp || t.exp >= today) return;
+    const closePrice = 0;
+    const gross = calcGross(t.setup, t.openPrice, closePrice, t.contracts);
+    const netPL = parseFloat((gross - (t.fees||0)).toFixed(2));
+    const days = Math.round((new Date(t.exp) - new Date(t.open)) / (1000*60*60*24));
+    const updated = {...t, status:'Expired', close:t.exp, closePrice, gross, netPL, days};
+    trades[idx] = updated;
+    toUpdate.push(updated);
+  });
+  if (toUpdate.length === 0) return;
+  console.log('[sweepExpired] flipping', toUpdate.length, 'trade(s) to Expired:', toUpdate.map(t=>t.id));
+  showStatus('Auto-expiring ' + toUpdate.length + ' trade(s)...', 'info');
+  for (const t of toUpdate) {
+    try { await saveTrade(t); } catch(e) { console.error('[sweepExpired] save failed for', t.id, e); }
+  }
+  showStatus('✓ Expired ' + toUpdate.length + ' trade(s)', 'success');
+}
+
 // Auth session — populated after login, persisted in localStorage
 let authSession = null;
 const SESSION_STORAGE_KEY = 'optdash_auth_session';
@@ -784,6 +811,7 @@ async function loadFromDB() {
       trades = rows.map(rowToTrade);
       dbAvailable = true;
       showStatus('✓ ' + trades.length + ' trades loaded from cloud', 'success');
+      await sweepExpired();
     } else {
       // DB is empty — seed it with existing data
       dbAvailable = true;
