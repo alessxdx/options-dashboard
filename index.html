@@ -684,6 +684,35 @@ async function sweepExpired() {
   showStatus('✓ Expired ' + toUpdate.length + ' trade(s)', 'success');
 }
 
+// ── One-time backfill for historical Expired trades ───────────────────────────
+// Older Expired trades were marked manually before sweepExpired() existed,
+// so they're missing close date, closePrice, and days. This fills them in:
+//   close = exp, closePrice = 0, days = exp - open, recompute gross/netPL.
+// Becomes a no-op once all historical rows are backfilled.
+async function backfillExpiredCloseDates() {
+  const toUpdate = [];
+  trades.forEach((t, idx) => {
+    if (t.status !== 'Expired') return;
+    // Skip if close date already filled — that's the marker we use to detect "done"
+    if (t.close) return;
+    if (!t.exp || !t.open || !hasVal(t.openPrice)) return;
+    const closePrice = 0;
+    const gross = calcGross(t.setup, t.openPrice, closePrice, t.contracts);
+    const netPL = parseFloat((gross - (t.fees||0)).toFixed(2));
+    const days = Math.round((new Date(t.exp) - new Date(t.open)) / (1000*60*60*24));
+    const updated = {...t, close:t.exp, closePrice, gross, netPL, days};
+    console.log('[backfill]', t.id, 'netPL:', t.netPL, '→', netPL, '| days:', t.days, '→', days, '| close: "" →', t.exp);
+    trades[idx] = updated;
+    toUpdate.push(updated);
+  });
+  if (toUpdate.length === 0) return;
+  showStatus('Backfilling ' + toUpdate.length + ' historical expired trade(s)...', 'info');
+  for (const t of toUpdate) {
+    try { await saveTrade(t); } catch(e) { console.error('[backfill] save failed for', t.id, e); }
+  }
+  showStatus('✓ Backfilled ' + toUpdate.length + ' trade(s)', 'success');
+}
+
 // Auth session — populated after login, persisted in localStorage
 let authSession = null;
 const SESSION_STORAGE_KEY = 'optdash_auth_session';
@@ -812,6 +841,7 @@ async function loadFromDB() {
       dbAvailable = true;
       showStatus('✓ ' + trades.length + ' trades loaded from cloud', 'success');
       await sweepExpired();
+      await backfillExpiredCloseDates();
     } else {
       // DB is empty — seed it with existing data
       dbAvailable = true;
